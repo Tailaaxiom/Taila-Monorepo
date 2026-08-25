@@ -881,29 +881,96 @@ trusting the merge succeeded — a green `tsc`/`next build` on a stale
 cached version would not have caught this, only actually looking at the
 file's current byte count would have.
 
-## Open at end of this session
+## 2026-08-25 — Compose Report, last of the cross-cutting pages
 
-- **No Supabase project exists yet.** Migrations are written and reviewed but
-  never run. `.env.example` documents the three vars needed; nothing works
-  end to end until a project exists and `NEXT_PUBLIC_SUPABASE_URL`,
-  `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are set in
-  `.env.local`.
-- **`database.types.ts` is stale.** It reflects the legacy 79-table schema,
-  not the new migrations. Both Supabase clients are currently untyped rather
-  than pinned to the wrong `Database` generic — deliberate, to avoid a wall of
-  false errors, but real type safety is missing until this is regenerated.
-  Once the project exists and migrations run:
-  `supabase gen types typescript --linked > packages/core/src/types/database.types.ts`,
-  then add the `<Database>` generic back to both clients, then remove the
-  legacy-shape branches in `employee.ts`'s `parseStringArray()`.
-- No pages read real data yet — all six existing pages still read fixtures.
-  Wiring one page (staff dashboard is simplest) to a real Supabase query, once
-  the project exists, is the natural next check that RLS is actually correct
-  rather than just plausible.
-- No UI exists for issuing a setup token beyond the raw API route — an admin
-  currently needs to call `POST /api/auth/issue-setup-token` directly.
-- Pages carried over: staff dashboard, staff tasks (list + detail), leadership
-  dashboard, task manager, project monitor, budget. Everything else in the nav
-  falls through to `/coming-soon`.
-- `docs/INTERFACE.md` on hold — color scheme to be decided against the legacy
-  screenshots before any real UI work.
+Built `/compose` (`p-compose` — finance, HOD, HR, leadership, staff; not
+donor). New table, `0010_summary_reports.sql`: the backbone of the
+reporting chain the handover describes (staff/HOD submit, leadership reads
+the roll-up) — this page is the write side only. Submit Report and
+Summary Reports, the read/roll-up views, remain separate and unbuilt;
+they'll read this same table.
+
+Same v1 scope trade-off already made and stated plainly for
+tasks/projects/appointments: any non-donor org member can read and write
+any report, not filtered to a real reporting hierarchy yet — the
+migration's own comment says so rather than leaving it implicit.
+
+Hit the now-familiar new-table wall immediately: `tsc --noEmit` failed
+because the real types don't know about `summary_reports` until the
+migration is run and regenerated. Added a PROVISIONAL stub to
+`database.types.ts`, matching the established format, clearly labeled,
+alphabetically placed after `projects`.
+
+Verified: `tsc --noEmit` clean, `next build` clean, 23 routes in this
+sandbox specifically — this sandbox never received the actual `messages`
+page files Claude Code wrote (only the docs describing them), so this
+count is one lower than the real repo's true total. Not a discrepancy to
+chase, just an artifact of what files were actually shared this round.
+
+**Action for the user, same routine as appointments and messages**: run
+`0010_summary_reports.sql`, regenerate `database.types.ts` for real, send
+it over — the stub gets replaced wholesale, not merged alongside.
+
+This closes out the cross-cutting round (Search, Appointments, Messages,
+Compose Report). Next per the agreed order: HOD workspace, entirely
+unbuilt — 11 pages. HR after that, 2 pages.
+
+## 2026-08-25 — Real types confirmed for summary_reports, second stub retired
+
+User regenerated database.types.ts after running 0010. 17 tables now (was
+15 at last confirmation — messages had also landed in between). Compared
+the real summary_reports Row shape against the PROVISIONAL stub from the
+previous entry — exact match, field for field, same as the appointments
+confirmation before it. Installed the real file wholesale.
+
+Verified: tsc --noEmit clean, next build clean. No code changes needed.
+
+## Open at end of this session (2026-08-25)
+
+**Convention fix, stated plainly since it caused a real problem**: this
+section was left untouched for the entire build — every session's new
+entry was inserted *above* this marker, never revising the marker's own
+content. It went stale weeks ago and nobody caught it because nothing
+forced a look back at it. Two people (this session's reviewer, and
+whoever reads this next) found it claiming "no Supabase project exists"
+long after one did. Going forward: **this section must be rewritten, not
+just left in place, at the end of any session that closes a real gap it
+mentions.** If in doubt whether it's current, it probably isn't — check
+against the resolver-based backlog count below instead of trusting this
+list by eye.
+
+**Authoritative source for "what pages are missing"**: not this list —
+run the real gating resolver against every role and cross-reference
+`page-routes.ts`, the same check used in EXECUTION.md's "Backlog
+reckoning" entry (2026-08-19). A hand-maintained bullet list of missing
+pages will go stale the same way this whole section did; the resolver
+script can't lie about what's actually wired. As of 2026-08-25: **17 of
+59 unique NGO pages built, 42 still `/coming-soon`** — Compose Report is
+the last cross-cutting one; HOD (11 pages) and HR (2 pages) are entirely
+unbuilt workspaces.
+
+**Genuinely still open, checked against the real current state, not
+copied from an old list**:
+
+- Task/project write access is org-wide for any non-donor staff member —
+  the handover's real rule (leadership org-wide, HOD within department,
+  staff only their own) needs per-row filtering, not implemented.
+- Milestone verification isn't reviewer-gated at the RLS layer —
+  `app.is_reviewer()` exists (0003) and is unused on `project_milestones`.
+- Single-project assumption on the two project-related pages — querying
+  "most recent project" rather than supporting multiple.
+- Task submission (`staff/tasks/[id]`) is still local-only React state,
+  not a real write.
+- No UI for editing/deleting an appointment or a fund line once created;
+  same for most other create-only forms built this project — add-only,
+  no edit/delete, throughout.
+- `database.types.ts` regenerates as UTF-16LE with CRLF every time,
+  confirmed twice now (see LEARNINGS.md). No automated guard exists yet —
+  still caught by eye each time. Worth a `postinstall`/`predev` script
+  that normalizes it automatically rather than relying on remembering to
+  check.
+- Messages has no read-receipt, edit, or unsend — immutable by design for
+  v1, not a bug, but worth knowing before assuming it's a full messaging
+  feature.
+- `docs/INTERFACE.md` still on hold — color scheme to be decided against
+  the legacy screenshots before any real UI/visual work.

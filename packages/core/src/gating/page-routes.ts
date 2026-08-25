@@ -16,6 +16,7 @@ const PAGE_ROUTES: Record<string, string> = {
   'p-search': '/leadership/search',
   'p-appointments': '/appointments',
   'p-messages': '/messages',
+  'p-compose': '/compose',
 };
 
 const ROLE_HOME: Record<string, string> = {

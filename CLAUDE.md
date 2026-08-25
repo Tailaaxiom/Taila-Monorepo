@@ -29,7 +29,7 @@ apps/ngo/src/
   lib/auth/       identity.ts, setup-tokens.ts, RealCurrentUserProvider.tsx
   lib/fixtures/   NGO-specific sample/test data — NOT in packages/core, see below
 
-supabase/migrations/   0001-0009 so far, run in order, SQL Editor, one at a time
+supabase/migrations/   0001-0010 so far, run in order, SQL Editor, one at a time
 docs/                  EXECUTION.md, LEARNINGS.md, INTERFACE.md
 ```
 
@@ -132,10 +132,19 @@ it at `/activate` to set their own password. See `LEARNINGS.md` for exactly
 why the legacy scheme (`password = 'axm:' + employee_code`) couldn't be
 ported — it's a real, specific vulnerability, not a style preference.
 
-## Known open gaps (see EXECUTION.md for full detail on each)
+## Checking what's actually built
 
-- Donor portal not built yet — RLS proves the curated read is possible
-  (`fund_lines`, `activities`, `programmes`, `media`), no pages exist.
+**Don't trust a hand-maintained list of missing pages, including the one
+below** — a version of this exact section went stale for weeks in this
+project (it kept claiming the donor portal didn't exist long after it
+did) because nothing forced anyone to revisit it. The authoritative check
+is mechanical: run the real gating resolver against every role and
+cross-reference `page-routes.ts`. See EXECUTION.md's "Backlog reckoning"
+(2026-08-19) entry for the exact script. Re-run it rather than trusting
+any prose list, including this file's, before treating a count as current.
+
+## Known open gaps, current as of 2026-08-25 (see EXECUTION.md for detail)
+
 - Task/project write access is org-wide for any non-donor staff member —
   the handover's real rule (leadership org-wide, HOD within department,
   staff only their own) needs per-row filtering, not implemented.
@@ -144,4 +153,12 @@ ported — it's a real, specific vulnerability, not a style preference.
 - Single-project assumption on the two project-related pages — querying
   "most recent project" rather than supporting multiple.
 - Task submission (`staff/tasks/[id]`) is still local-only React state, not
-  a real write — this was true before the tables existed and still is.
+  a real write.
+- `database.types.ts` regenerates as UTF-16LE with CRLF every time it's
+  produced, confirmed twice now (see LEARNINGS.md, including a real
+  incident where a GitHub-UI merge silently emptied the file because of
+  it). No automated normalization exists yet.
+- 42 of 59 unique NGO pages are still `/coming-soon` as of the last check
+  — HOD and HR are entirely unbuilt workspaces. This number goes stale the
+  moment another page ships; re-run the check above rather than trusting
+  it here.
