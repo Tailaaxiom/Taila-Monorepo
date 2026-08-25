@@ -1,18 +1,30 @@
 # Taila Axiom — monorepo
 
-Sector apps built on one shared package. `apps/manufacturing` was the pilot;
-`apps/ngo` is the first app built on the extracted core.
+An operations platform for organizations, built one sector at a time.
+`packages/core` is a shared, sector-neutral toolbox; `apps/ngo` is the
+first real app built on it, for NGOs — auth, RLS, and real Supabase data
+all the way through, not a prototype.
 
 ```
 packages/core     shared: types, gating, business logic, UI primitives, shell
-apps/ngo          NGO sector app
+apps/ngo          NGO sector app — real auth, RLS, and live data
+supabase/         migrations, run in order against the live project
+docs/             build history, hard-won lessons, design decisions
 ```
+
+**Start with [`CLAUDE.md`](./CLAUDE.md)** at the repo root — it's the
+actual technical entry point: build commands, architecture, the rules that
+have each already caused a real bug when broken once, the auth model, and
+an honest list of what's genuinely still unfinished. This README is a
+human-facing overview; CLAUDE.md and `docs/` are where the real detail and
+the current state live, kept there specifically so they don't drift out of
+sync the way a hand-maintained top-level README tends to.
 
 ## Commands
 
 ```bash
 npm install          # root, installs all workspaces
-npm run dev          # turbo, all apps
+npm run dev           # turbo, all apps
 npm run build
 npm run typecheck
 ```
@@ -31,53 +43,19 @@ import { Card } from '@taila/core/components/ui/Card';
 import type { Employee } from '@taila/core/types/employee';
 ```
 
-Contents: `types/` (26 hand-checked types + generated `database.types.ts`),
-`gating/` (the five registries + resolver), `projects/milestones`,
-`finance/invoice-matching`, `kpi/sessions`, `monitoring/aggregate`,
-`tasks/status`, `components/ui`, `components/shell`.
+**Contains no fixture, sample, or default data of any kind** — that's a
+hard rule, not a style preference, after it caused a real bug once (see
+`docs/LEARNINGS.md`). Sector-specific sample data lives in each consuming
+app's own `lib/fixtures/`.
 
-Sector-specific fixtures do **not** live here. `apps/ngo/src/lib/fixtures/`
-holds the NGO org and employees.
+## Where things actually are
 
-## How the NGO app resolves its sector
-
-The fixture org's sector is the free-text string `'Development and Advocacy'`,
-not the key `'ngo'` — so `getSectorKey()` runs for real on every render, and
-`organizations.modules` is left `null` so `orgModuleSet()` falls through to
-`SECTOR_MODULES.ngo`. Nothing is hardcoded. Verified output:
-
-- modules: `payroll, funders, multicurrency, livemap, offline, story, orgsuite`
-- leadership 34 pages, finance 13, staff 12, donor 4
-- no production / property / hospitality / social / inventory / margins pages
-
-## Corrections to the handover documents
-
-Found by reading the legacy source and the live schema. Both handover docs are
-wrong on these points:
-
-1. **`targets` is not a general target system.** Live schema is
-   `org_id, activities, beneficiaries, field_visits, media_outputs, trainings,
-   reporting_period` — no `id`, one row per org, hardcoded to NGO metrics.
-   "Targets & Tasks" is a fixed scorecard, not a CRUD page.
-2. **`axIsReviewer()` exists** (legacy line 16936):
-   `role === 'leadership' || 'hod' || 'admin'`. Milestone sign-off, monitor
-   editing and task stage changes are restricted in production, not open.
-3. **Payroll is fully implemented** (legacy line 8281). Real Nigeria Tax Act
-   bands, 20% rent relief capped at NGN 500,000, 8% pension, optional 2.5% NHF.
-   Port it; do not rebuild it.
-4. **Legacy auth derives passwords from the employee code**
-   (`derivedPwd = 'axm:' + code`) against synthetic
-   `orgid.code@tailaaxiom.com` addresses. Employee codes are visible across the
-   app, so any account is derivable from any other. **Not ported.** The NGO app
-   needs a real sign-in model before it holds real data.
-
-## Current state
-
-Skeleton only. Pages carried over from the pilot: staff dashboard, staff tasks
-(list + detail), leadership dashboard, task manager, project monitor, budget.
-Everything else in the nav falls through to `/coming-soon`.
-
-Auth is stubbed by a preview-user switcher
-(`apps/ngo/src/lib/fixtures/preview-context.tsx`). Delete that file when real
-auth lands. There is no Supabase client wired yet — `@supabase/supabase-js`
-and `@supabase/ssr` are installed but unused.
+- `docs/EXECUTION.md` — a timestamped build log. What was done, in order,
+  including the real bugs found and how they were fixed.
+- `docs/LEARNINGS.md` — traps and lessons that cost real time once, written
+  down so they don't cost time again.
+- `docs/INTERFACE.md` — design decisions. Currently on hold; visual/color
+  design work is deliberately deferred until reviewed against the legacy
+  app's screenshots.
+- `supabase/migrations/` — run in order, one at a time, against the live
+  Supabase project. Each one is commented with *why*, not just *what*.
