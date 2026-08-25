@@ -746,6 +746,94 @@ this was purely a types swap, confirming the stub's job (unblock local
 verification without being mistaken for the real thing) worked as
 intended.
 
+## 2026-08-25 — Messages (p-messages)
+
+Built the last cross-cutting page from the agreed backlog order (Search,
+Appointments, **Messages**, then the rest). Reachable by every NGO role,
+donor included — confirmed against the real gating output
+(`getNavItems()`/`NAVMAP`), not assumed: `NAVMAP.donor` genuinely carries
+`p-messages`, unlike `p-appointments`, which does not.
+
+**Real design decision, not just wiring**: unlike every other table added
+this project (tasks, appointments — both explicitly org-wide v1 scope,
+gap tracked for later), messages are scoped to the two participants from
+the start. A private message readable by every colleague would defeat the
+point of the feature, so this isn't a deferred narrowing, it's the correct
+rule immediately. `0009_messages.sql`:
+
+- `recipient_code` is free-text `employee_code`, same pattern as
+  `tasks.assignee` (0005) and `appointments.attendees` (0008) — not a
+  foreign key.
+- `sender_code`/`sender_name` is a denormalized pair, same shape as
+  `media.uploaded_by_code`/`uploaded_by_name` (0007). This one matters more
+  than it did there: `employees_read_org` (0003) denies donors any
+  directory read, so a donor receiving a message from staff has no other
+  way to learn who sent it — denormalizing at insert time sidesteps that
+  entirely rather than requiring a new RLS carve-out.
+- `refs` (nullable `jsonb`) exists per `packages/core/src/types/message.ts`'s
+  pre-existing `MessageRef` (a "this is about task/project/funder X" tag,
+  ported from the original monorepo restructure but never backed by a real
+  table until now) — not populated by this v1's UI. No picker exists yet,
+  same trade-off already stated for tasks' geofence fields.
+- No `updated_at`, no touch/freeze triggers, no update/delete policy:
+  messages are immutable once sent. No edit/unsend/read-receipt feature
+  exists.
+- RLS: `messages_read_participant` (`org_id = app.org_id() and (sender_code
+  = app.employee_code() or recipient_code = app.employee_code())`) and
+  `messages_insert_by_participant` (same org check, plus `sender_code =
+  app.employee_code()` — sender identity is asserted by the database, not
+  trusted from the client, so nobody can send as someone else).
+  `org_id = app.org_id()` rather than `app.is_staff_of(org_id)` is
+  deliberate — the latter excludes donors, and a donor here is meant to be
+  a full participant, exactly like anyone else with an active `employees`
+  row (0003's own description of what a donor is).
+
+Built `/messages` (`p-messages`, previously falling through to
+`/coming-soon`) — top-level route, not nested under `/leadership/`, same
+reasoning as `/appointments`: reached by every role, not just
+leadership-adjacent ones. No page-level role check — every NGO role in
+`NAVMAP` carries `p-messages`, so anyone with a session is a valid
+participant. Server page + client component split, same pattern as every
+other page this project: compose form (recipient code, body) plus an
+Inbox/Sent split (received vs. sent, rather than upcoming/past like
+Appointments — the more natural split for a message list).
+
+**Also fixed in passing, not the main point of this pass**:
+`packages/core/src/types/database.types.ts` was still genuinely UTF-16LE
+with CRLF line endings on disk, despite this file's own 2026-08-19 entry
+("Real database types wired in") and `docs/LEARNINGS.md` both stating it
+had been converted to UTF-8. `tsc`/`next build` never caught this because
+both decode a BOM correctly regardless of source encoding — it only
+surfaced because a previous review pass ran `file` on it directly. `file`
+misdetected the picture originally described to the user as "already
+UTF-8 with just a stray BOM"; that was wrong, it was real UTF-16LE.
+Converted for real this time (`iconv -f UTF-16LE -t UTF-8`, BOM and `\r`
+stripped), verified by line count and `file` afterwards, before adding the
+`messages` stub below it.
+
+**Following the routine established for appointments (2026-08-19)**: no
+Supabase credentials are available in this session (`supabase login` was
+run once, on a different machine/session — `npx supabase db push` here
+fails with `LegacyPlatformAuthRequiredError`), so `0009_messages.sql` is
+written and reviewed but not yet run against the live project. Added a
+PROVISIONAL stub for the `messages` table to `database.types.ts`, built by
+comparing against `appointments` (a structurally similar real table) and
+clearly commented as such, to unblock local verification.
+
+**Action for the user, same two steps as appointments**: run
+`0009_messages.sql` in the SQL Editor, then regenerate
+`database.types.ts` for real (`supabase gen types typescript --linked`)
+— the provisional stub should be replaced wholesale, not merged alongside.
+
+Verified: `tsc --noEmit` clean, `next build` clean (26 routes, `/messages`
+correctly dynamic), `eslint` clean on the new files.
+
+**Not yet tested against real data** — no message has actually been sent
+through the UI yet (no live project to send it to). Natural next check
+once the migration is run: two accounts of different roles (including one
+donor), confirm each sees only their own sent/received messages and not
+each other's unrelated conversations.
+
 ## Open at end of this session
 
 - **No Supabase project exists yet.** Migrations are written and reviewed but
