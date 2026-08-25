@@ -327,3 +327,36 @@ Fixed by bumping `@supabase/ssr` to current (`^0.12.4`) in
 `apps/ngo/package.json`. Once genuine version mismatches were ruled out, the
 remaining real errors (two, not dozens) were exactly the schema differences
 worth finding — see the `task.ts` entry above.
+
+
+## A GitHub-UI merge of a UTF-16 file can silently produce an empty file, not a conflict
+
+`database.types.ts` regenerates as UTF-16LE with CRLF every time
+`supabase gen types` is run on the machine that produced it (see the
+correction entry above — this recurred one session after being "fixed for
+real," so treat it as a standing property of that workflow, not a one-off).
+A line-based diff/merge tool sees a file like that as mostly binary. On
+2026-08-25, a merge commit made through GitHub's web UI
+(`19fac67`, "Merge branch 'main' into claude/repo-review-c292wz") resolved
+a change to this file by reducing it to a **completely empty file** —
+zero bytes, not conflict markers, not one side's content, not a diff
+error. Nothing about the merge UI flagged this as a conflict; it looked
+like a normal, successful merge in the PR history.
+
+This is dangerous specifically because it doesn't fail loudly. Every
+Supabase client in the app carries the `Database` generic from this exact
+file, so an empty file breaks the build completely — but nobody sees that
+until they actually run `tsc`/`next build` against the merged tree. A
+stale local `node_modules`/`.next` cache, or simply not rebuilding after
+pulling, would hide it further.
+
+**Practical rule**: after any merge or rebase touches `database.types.ts`
+(or any other UTF-16/binary-ish generated file), check its byte count is
+sane and its encoding is still what's expected — `wc -l` and `file
+<path>` are both fast — before trusting that the merge "took." Don't infer
+success from the merge commit having no conflict markers; a binary-ish
+file merging "cleanly" is exactly the case where that inference is wrong.
+Recovered by pulling the known-good blob directly from the commit that
+introduced the real content (`git show <sha>:<path>`), not by
+re-requesting a fresh regeneration — the correct bytes already existed in
+history, they'd just been dropped by the merge, not lost.

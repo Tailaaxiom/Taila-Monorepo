@@ -834,6 +834,53 @@ once the migration is run: two accounts of different roles (including one
 donor), confirm each sees only their own sent/received messages and not
 each other's unrelated conversations.
 
+## 2026-08-25 — Real messages migration run, and recovered a merge that emptied database.types.ts
+
+The user ran `0009_messages.sql` against the live project and pushed a
+"env.example and types repull" commit directly to this branch (also fixed
+`apps/ngo/.env.example`, previously a 0-byte file, filling in the three
+required vars — but with a typo, `PABASE_SERVICE_ROLE_KEY` instead of
+`SUPABASE_SERVICE_ROLE_KEY`, fixed in this pass). Their regenerated
+`database.types.ts` had the real `messages` table, matching the PROVISIONAL
+stub field-for-field — same confirmation step already used once for
+appointments.
+
+**Found a real, live bug on this branch before it could bite anyone**: a
+GitHub-UI merge commit already present on the remote branch
+(`19fac67`, "Merge branch 'main' into claude/repo-review-c292wz") had
+reduced `database.types.ts` to a completely empty file — not a conflict,
+not a bad merge of content, an empty file, silently committed. Confirmed
+by extracting the blob directly (`git show 19fac67:...`); merging that
+state into the local branch reproduced it immediately. Every Supabase
+client in the app is typed against `Database` from this file, so this
+would have broken the build for anyone who pulled the branch as it stood.
+
+Root cause is almost certainly the recurring one already in
+docs/LEARNINGS.md: `database.types.ts` is UTF-16LE with CRLF (the
+generator's Windows-side output, per the "types repull" commit — same
+issue flagged again just one session after the previous "fixed for real
+this time" entry above, so evidently it keeps regenerating this way and
+needs re-checking every time, not just once). A UTF-16 file reads as
+mostly binary to a line-based diff/merge; GitHub's web merge UI has no way
+to merge two binary versions and appears to have resolved the conflict by
+picking neither side's content.
+
+**Fixed by recovering the real content, not by re-deriving it**: pulled
+the real regenerated blob from the "types repull" commit directly
+(`git show 812dbed:packages/core/src/types/database.types.ts`), converted
+UTF-16LE → UTF-8, stripped the BOM and `\r`, verified line count and
+`file` output, and installed that as the real `database.types.ts` —
+same conversion done earlier this session for the same file, now needed
+a second time because the merge undid it. `tsc --noEmit` and `next build`
+both clean afterward, `/messages` still correctly dynamic among 26 routes.
+
+**Practical rule worth stating plainly for next time this file is
+regenerated**: after any merge or rebase that touches
+`database.types.ts`, check that the file is non-empty and UTF-8 before
+trusting the merge succeeded — a green `tsc`/`next build` on a stale
+cached version would not have caught this, only actually looking at the
+file's current byte count would have.
+
 ## Open at end of this session
 
 - **No Supabase project exists yet.** Migrations are written and reviewed but
