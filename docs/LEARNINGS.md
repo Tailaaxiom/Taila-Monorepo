@@ -156,6 +156,25 @@ value as the thing used to look someone up (the employee code).
   in `packages/core` didn't know that until it was checked by hand — the
   compiler won't catch it while `database.types.ts` is stale, per above.
 
+- **Correction to the entry above ("`database.types.ts` was UTF-16... Converted
+  to UTF-8 in the monorepo"): that conversion did not stick, or was never
+  actually committed.** Found 2026-08-25, a session after it was declared done:
+  the file on disk was genuinely UTF-16LE with CRLF line endings, not UTF-8.
+  Nobody noticed for a full session because `tsc`/`next build` both decode a
+  BOM correctly regardless of source encoding, so the wrong encoding was
+  functionally invisible to every check this project runs. It was only caught
+  because a repo-review pass ran `file` on it directly — and even then, the
+  first read of that output was dismissed as a false positive (the reviewer
+  compared against an already-`iconv`-converted temp copy and concluded the
+  original was fine, backwards). **The general lesson: "converted" is a claim
+  about a past action, not a property of the current file — if a past entry
+  asserts an encoding/format fix and the file is easy to check, check the file,
+  don't trust the log.** `file <path>` is the fast check; don't reason about it
+  by proxy from a copy you already fixed. Re-converted for real this time
+  (`iconv -f UTF-16LE -t UTF-8`, `\r` and BOM stripped), verified by line count
+  and `file` afterwards, in the same pass that added the `messages` table stub
+  (see docs/EXECUTION.md, 2026-08-25).
+
 
 ## packages/core must contain zero fixture or sample data
 

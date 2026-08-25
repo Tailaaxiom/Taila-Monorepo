@@ -29,7 +29,7 @@ apps/ngo/src/
   lib/auth/       identity.ts, setup-tokens.ts, RealCurrentUserProvider.tsx
   lib/fixtures/   NGO-specific sample/test data — NOT in packages/core, see below
 
-supabase/migrations/   0001-0008 so far, run in order, SQL Editor, one at a time
+supabase/migrations/   0001-0009 so far, run in order, SQL Editor, one at a time
 docs/                  EXECUTION.md, LEARNINGS.md, INTERFACE.md
 ```
 
