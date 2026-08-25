@@ -1,0 +1,21 @@
+// src/lib/gating/module-catalog.ts
+export const MODULE_CATALOG: { k: string; l: string }[] = [
+  { k: 'payroll', l: 'Payroll & Tax' },
+  { k: 'funders', l: 'Funder Portals' },
+  { k: 'multicurrency', l: 'Multi Currency' },
+  { k: 'livemap', l: 'Live Command Map' },
+  { k: 'offline', l: 'Offline Capture' },
+  { k: 'clientportal', l: 'Client Portals' },
+  { k: 'margins', l: 'Project Margins' },
+  { k: 'story', l: 'Storytelling Engine' },
+  { k: 'logistics', l: 'Logistics Kit' },
+  { k: 'inventory', l: 'Inventory' },
+  { k: 'production', l: 'Production Floor' },
+  { k: 'property', l: 'Property and Sales' },
+  { k: 'social', l: 'Project Management' },
+  { k: 'hospitality', l: 'Hospitality Kit' },
+  { k: 'foodservice', l: 'Food Service' },
+  { k: 'concierge', l: 'Concierge Services' },
+  { k: 'assets', l: 'Assets, Rentals and Sales' },
+  { k: 'orgsuite', l: 'Full organization suite' },
+];

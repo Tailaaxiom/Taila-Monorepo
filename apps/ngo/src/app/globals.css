@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+/* Tailwind's automatic file scanning doesn't reliably cross into a sibling
+   monorepo package. packages/core lives outside apps/ngo entirely, so without
+   this line, some classes used only inside packages/core (like AppShell's
+   content offset) never get compiled into real CSS at all — the class name
+   sits in the code doing nothing. This @source directive is the officially
+   documented Tailwind v4 fix for shared UI packages in a monorepo. If a new
+   page or component in packages/core ever has a class that visibly "does
+   nothing," check this line still points at the right place before
+   suspecting anything else. See docs/LEARNINGS.md. */
+@source "../../../../packages/core/src";
+
+@theme {
+  /* surfaces */
+  --color-bg: #09090F;
+  --color-panel: #0F0F18;
+  --color-card: #13131E;
+
+  /* borders */
+  --color-border: #1C1C2E;
+  --color-border2: #242438;
+
+  /* text */
+  --color-white: #EEEDF8;
+  --color-muted: #6B6B88;
+  --color-muted2: #9898B0;
+
+  /* brand */
+  --color-gold: #C9922A;
+  --color-gold-light: #E8B84B;
+
+  /* per-org accent — aliases to gold until org branding is built */
+  --color-org: #C9922A;
+  --color-org-light: #E8B84B;
+
+  /* status */
+  --color-green: #2ECC78;
+  --color-red: #E05050;
+  --color-blue: #4A9EE8;
+  --color-purple: #8B6BE8;
+  --color-orange: #E8884A;
+
+  /* type */
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+  --font-wordmark: var(--font-wordmark);
+}
