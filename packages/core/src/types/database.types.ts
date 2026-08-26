@@ -869,6 +869,73 @@ export type Database = {
         }
         Relationships: []
       }
+      // PROVISIONAL — performance_reviews does not exist in the live schema
+      // yet. 0014_performance_reviews.sql is written but not run (no
+      // Supabase credentials in this session, same situation as every new
+      // table before it — see docs/EXECUTION.md). Built by comparing
+      // against summary_reports (a structurally similar existing table:
+      // denormalized author, period, status enum, touch/freeze triggers).
+      // Replace wholesale once the migration is run and types are
+      // regenerated for real — do not merge alongside the real shape.
+      performance_reviews: {
+        Row: {
+          areas_for_growth: string | null
+          created_at: string
+          employee_code: string
+          employee_name: string | null
+          id: string
+          notes: string | null
+          org_id: string
+          period: string
+          rating: number | null
+          reviewer_code: string | null
+          reviewer_name: string | null
+          status: string
+          strengths: string | null
+          updated_at: string
+        }
+        Insert: {
+          areas_for_growth?: string | null
+          created_at?: string
+          employee_code: string
+          employee_name?: string | null
+          id?: string
+          notes?: string | null
+          org_id: string
+          period: string
+          rating?: number | null
+          reviewer_code?: string | null
+          reviewer_name?: string | null
+          status?: string
+          strengths?: string | null
+          updated_at?: string
+        }
+        Update: {
+          areas_for_growth?: string | null
+          created_at?: string
+          employee_code?: string
+          employee_name?: string | null
+          id?: string
+          notes?: string | null
+          org_id?: string
+          period?: string
+          rating?: number | null
+          reviewer_code?: string | null
+          reviewer_name?: string | null
+          status?: string
+          strengths?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "performance_reviews_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       programmes: {
         Row: {
           created_at: string

@@ -30,10 +30,19 @@ export default async function StaffManagementPage() {
   // RLS-scoped: employees_read_org already restricts this to the caller's
   // own org (app.is_staff_of(org_id)), so no explicit org_id filter is
   // needed here — but see docs/LEARNINGS.md if that ever feels surprising.
+  //
+  // Now also selects the six salary-structure columns added in
+  // 0013_payroll_fields.sql for the HOD Payroll page. This is the first
+  // and only place they can be edited — previously SQL-only, which meant
+  // Payroll couldn't be exercised through the app at all. No new migration
+  // needed: employees_update_by_hr (0003) already covers leadership/hr/
+  // admin writes to this exact table.
   const supabase = await createClient();
   const { data: employees, error } = await supabase
     .from('employees')
-    .select('id, employee_code, full_name, role, department, email, login_mode, active, auth_user_id, created_at')
+    .select(
+      'id, employee_code, full_name, role, department, email, login_mode, active, auth_user_id, created_at, basic_salary, housing_allowance, transport_allowance, other_allowances, annual_rent, nhf_opt_in',
+    )
     .order('created_at', { ascending: false });
 
   if (error) {
