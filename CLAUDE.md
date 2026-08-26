@@ -29,7 +29,7 @@ apps/ngo/src/
   lib/auth/       identity.ts, setup-tokens.ts, RealCurrentUserProvider.tsx
   lib/fixtures/   NGO-specific sample/test data — NOT in packages/core, see below
 
-supabase/migrations/   0001-0010 so far, run in order, SQL Editor, one at a time
+supabase/migrations/   0001-0013 so far, run in order, SQL Editor, one at a time
 docs/                  EXECUTION.md, LEARNINGS.md, INTERFACE.md
 ```
 
@@ -40,12 +40,23 @@ npm install                    # root, installs all workspaces
 cd apps/ngo
 npx tsc --noEmit                # typecheck — run this before every build
 npm run build                   # full production build
+
+# from repo root — packages/core has its own tsconfig and checks every file
+# in the package, not just what apps/ngo happens to import. apps/ngo's tsc
+# being clean does NOT prove packages/core is fine — see LEARNINGS.md,
+# "A pre-existing, unused file in packages/core can already be committed
+# to a schema nobody told you about" (2026-08-26). Run this too whenever
+# you add a type or table to packages/core.
+npx tsc -p packages/core/tsconfig.json --noEmit
 ```
 
-Both must be clean before considering any change done. `next build` in this
-repo requires network access to fetch Google Fonts — if that's unavailable
-in a sandbox, the build fails at font-fetching only; that's environment, not
-a code bug, and everything else can still be checked with `tsc --noEmit`.
+All three must be clean (or fail only on the pre-existing, unrelated dead
+ported-type-file errors already logged in LEARNINGS.md/EXECUTION.md — check
+`git stash` before assuming a `packages/core` error is yours) before
+considering any change done. `next build` in this repo requires network
+access to fetch Google Fonts — if that's unavailable in a sandbox, the
+build fails at font-fetching only; that's environment, not a code bug, and
+everything else can still be checked with `tsc --noEmit`.
 
 **The Supabase CLI is already installed and linked to the real project**
 (`npx supabase login` / `npx supabase link` were run once, during setup).
@@ -143,22 +154,43 @@ cross-reference `page-routes.ts`. See EXECUTION.md's "Backlog reckoning"
 (2026-08-19) entry for the exact script. Re-run it rather than trusting
 any prose list, including this file's, before treating a count as current.
 
-## Known open gaps, current as of 2026-08-25 (see EXECUTION.md for detail)
+## Known open gaps, current as of 2026-08-26 (see EXECUTION.md for detail)
 
 - Task/project write access is org-wide for any non-donor staff member —
   the handover's real rule (leadership org-wide, HOD within department,
-  staff only their own) needs per-row filtering, not implemented.
+  staff only their own) needs per-row filtering, not implemented. The HOD
+  workspace's department-scoped pages filter what they *show* at the query
+  level; the underlying RLS policies still permit any non-donor staff
+  member to write any row — a page filter, not an RLS boundary.
 - Milestone verification isn't reviewer-gated at the RLS layer —
   `app.is_reviewer()` exists and is unused on `project_milestones`.
-- Single-project assumption on the two project-related pages — querying
-  "most recent project" rather than supporting multiple.
+- Single-project assumption on the project-related pages (leadership and
+  now hod) — querying "most recent project" rather than supporting
+  multiple.
 - Task submission (`staff/tasks/[id]`) is still local-only React state, not
   a real write.
 - `database.types.ts` regenerates as UTF-16LE with CRLF every time it's
-  produced, confirmed twice now (see LEARNINGS.md, including a real
+  produced, confirmed a third time now (see LEARNINGS.md, including a real
   incident where a GitHub-UI merge silently emptied the file because of
-  it). No automated normalization exists yet.
-- 42 of 59 unique NGO pages are still `/coming-soon` as of the last check
-  — HOD and HR are entirely unbuilt workspaces. This number goes stale the
-  moment another page ships; re-run the check above rather than trusting
-  it here.
+  it). No automated normalization exists yet — treat this as a standing
+  property of the regeneration workflow, not a one-time fix, and check
+  `file` on it every session that touches it.
+- Requests (`/hod/requests`) has no review flow — `approvals` (0012) has no
+  update policy; a leadership Approvals/Disbursement Queue page to review
+  requests doesn't exist yet. Deliberate v1 scope, not a bug.
+- Payroll (`/hod/payroll`) is read-only and has no run history — salary
+  structure can only be set via SQL (by design: `employees_update_by_hr`,
+  0003, correctly excludes hod), and PAYE is computed fresh on every read
+  rather than persisted per period.
+- `activity_events` (0011) is sparsely populated — only the HOD Tasks and
+  Submit Report pages write to it so far. Dept Feed and Access Log will
+  only show a fraction of real department activity until more write paths
+  (and the future Timeline/staff Team Feed pages) are wired to it.
+- Two dead, unreferenced duplicate routes exist:
+  `leadership/staff/dashboard/` and `leadership/staff/tasks/` are
+  byte-identical copies of `staff/dashboard/`/`staff/tasks/`, linked from
+  nowhere. Found, not removed — flagged for the user to decide.
+- 31 of 59 unique NGO pages are still `/coming-soon` as of the last check
+  — HR (2 pages) is the only entirely unbuilt workspace left. This number
+  goes stale the moment another page ships; re-run the check above rather
+  than trusting it here.

@@ -925,52 +925,258 @@ confirmation before it. Installed the real file wholesale.
 
 Verified: tsc --noEmit clean, next build clean. No code changes needed.
 
-## Open at end of this session (2026-08-25)
+## 2026-08-26 — HOD workspace (11 pages)
 
-**Convention fix, stated plainly since it caused a real problem**: this
-section was left untouched for the entire build — every session's new
-entry was inserted *above* this marker, never revising the marker's own
-content. It went stale weeks ago and nobody caught it because nothing
-forced a look back at it. Two people (this session's reviewer, and
-whoever reads this next) found it claiming "no Supabase project exists"
-long after one did. Going forward: **this section must be rewritten, not
-just left in place, at the end of any session that closes a real gap it
-mentions.** If in doubt whether it's current, it probably isn't — check
-against the resolver-based backlog count below instead of trusting this
-list by eye.
+Built the entire HOD workspace per the agreed order (HOD after the
+cross-cutting round, HR after that). Checked the real gating output first,
+not the handover's prose: `NAVMAP.hod` carries 11 `p-hod-*` page ids that
+were NGO-reachable and still `/coming-soon` — `p-hod-dashboard`,
+`p-hod-team`, `p-hod-tasks`, `p-hod-summaries`, `p-hod-submit`,
+`p-hod-feed`, `p-hod-access`, `p-hod-payroll`, `p-hod-projects`,
+`p-hod-requests`, `p-hod-media` — matching the task's own count exactly.
+The rest of `NAVMAP.hod` (`p-mf-*`, `p-sm-*`, `p-re-*`) is module-gated to
+sectors the NGO app never resolves to, already correctly hidden; `p-search`/
+`p-messages`/`p-appointments`/`p-compose`/`p-lead-templates` are shared
+pages already built or out of scope. None of the 11 `p-hod-*` ids appear in
+any other role's `NAVMAP` entry — reachable only by `hod` (plus `extra_roles`/
+`extra_pages`, the general per-employee grant mechanism, unused by default).
+All 11 gated to `hod`/`admin` at the page level, RLS as the real boundary
+underneath as always.
 
-**Authoritative source for "what pages are missing"**: not this list —
-run the real gating resolver against every role and cross-reference
+New top-level route group `/hod/*`, mirroring `/leadership/*` and
+`/staff/*`.
+
+**Reused existing tables, department-filtered, no new schema** (7 pages):
+- **My Team** (`/hod/team`) — `employees`, filtered to
+  `department = employee.department`. Read-only; adding staff and issuing
+  setup tokens stays Staff Management's job.
+- **Dept Dashboard** (`/hod/dashboard`) — `tasks`, `dept`-filtered, same
+  stat-tile shape as `staff/dashboard`.
+- **Tasks** (`/hod/tasks`) — `tasks`, `dept`-filtered read + write form
+  (department fixed, not free text like leadership's org-wide version).
+- **Media Library** (`/hod/media`) — `media`, `department`-filtered
+  read + upload form, same pattern as `leadership/media`.
+- **Team Summaries** (`/hod/summaries`) — `summary_reports`,
+  `department`-filtered, read-only roll-up.
+- **Submit Report** (`/hod/submit`) — `summary_reports`, write form with
+  department fixed to the HOD's own. Distinct page id from the
+  cross-cutting Compose Report (`p-compose`, still reachable by hod too),
+  not a replacement for it — the handover names both separately.
+- **Projects** (`/hod/projects`) — `projects` + `project_milestones`,
+  deliberately **not** department-filtered: the table has no department
+  column, and the existing single-project v1 assumption (leadership's own
+  page already only shows the most recent project org-wide) leaves nothing
+  to filter by department yet. Stated explicitly rather than silently
+  narrower than it looks — a real future need if multi-project support
+  ever lands. Client component intentionally duplicates
+  `LeadershipProjectsClient` rather than cross-importing it, matching how
+  every other near-identical pair of pages in this project (e.g.
+  `staff/dashboard` vs `staff/tasks`) each own their client component.
+
+**New infrastructure** (migrations `0011`–`0013`):
+
+- **`0011_activity_events.sql`** — backs Access Log (`/hod/access`) and
+  Dept Feed (`/hod/feed`), both reading the same table, dept-filtered, with
+  different framing (audit-style table vs. casual feed list) since the
+  handover names them as separate pages, not because the data differs.
+  Both Tasks and Submit Report insert into it (best-effort, after their own
+  primary write succeeds), so the table has real content immediately
+  rather than sitting empty until something else populates it later — the
+  user's own call when asked whether Dept Feed should read this table or
+  aggregate existing tables instead. Per the handover this table is also
+  meant to become the backbone for Timeline (leadership) and the staff
+  Team Feed later — both out of scope here, the reason it was shaped
+  generically rather than narrowly for Access Log alone.
+
+  **Real discovery mid-build, not assumed going in**: running
+  `packages/core`'s own standalone `tsconfig.json` (not just `apps/ngo`'s,
+  which never reaches a file nothing imports) surfaced
+  `packages/core/src/kpi/sessions.ts` — pure logic ported wholesale in the
+  original monorepo restructure (2026-08-18), sitting completely unused and
+  invisible until now — already importing an `ActivityEvent` type from this
+  exact module path and building work sessions out of `'login'`/`'logout'`
+  events keyed by `user_code`/`user_name`/`role`. The table was designed
+  with `actor_code`/`actor_name` first; renamed to `user_code`/`user_name`
+  and added a `role` column to match this pre-existing real consumer
+  instead of colliding with it under different field names. One table now
+  genuinely serves three consumers instead of two, found instead of guessed.
+  The type file wrapping the table (`types/activity-event.ts`) turned out
+  to be pre-existing too, not new — overwritten without reading it first,
+  functionally identical afterward but a real process slip; see
+  docs/LEARNINGS.md for the full correction and the practical rule that
+  came out of it.
+
+- **`0012_approvals.sql`** — minimal, stated scope: Requests
+  (`/hod/requests`) lets a person submit a request and see their own
+  status. No leadership review/approve UI in this pass (`p-lead-approvals`
+  doesn't exist either) — no update policy on the table for exactly that
+  reason, not built halfway silently. Shape follows the ported-but-
+  previously-unbacked `packages/core/src/types/approval.ts` (now finally
+  wired to a real table) and the schema trap already in
+  docs/LEARNINGS.md: `req_items` is JSON-encoded text, not `jsonb`.
+
+- **`0013_payroll_fields.sql`** — `ALTER TABLE employees` adding
+  `basic_salary`, `housing_allowance`, `transport_allowance`,
+  `other_allowances`, `annual_rent`, `nhf_opt_in`. Columns on `employees`
+  rather than a new `payroll` table: this is current salary structure
+  (per-employee state, same kind of thing `hourly_rate` already is), not a
+  transactional ledger — there's no payroll *run* history in this v1, PAYE
+  is computed on read from whatever the columns currently hold, same
+  trade-off already made for `fund_lines.disbursed`. Payroll
+  (`/hod/payroll`) is deliberately **read-only**: `employees_update_by_hr`
+  (0003) correctly excludes `hod` from writing to `employees` — a
+  department head not being able to edit compensation data without HR is
+  the right RLS boundary, not a page that should route around it with an
+  edit form. Setting salary structure is SQL-only for now, a real stated
+  gap.
+
+  `packages/core/src/finance/payroll.ts` — direct port of the legacy
+  `computePAYE()` per docs/LEARNINGS.md's "Payroll is fully built, not
+  deferred" entry: band widths (not thresholds), 8% pension, optional 2.5%
+  NHF, rent relief at 20% capped at 500,000. Not re-derived.
+
+Same routine as appointments/messages/summary_reports before it: no
+Supabase credentials in this session (`npx supabase db push` still fails
+with `LegacyPlatformAuthRequiredError`), so all three migrations are
+written and reviewed but not run. PROVISIONAL stubs added to
+`database.types.ts` for `activity_events`, `approvals`, and the six new
+`employees` columns, matching the established format and clearly labeled.
+**Action for the user**: run `0011_activity_events.sql`,
+`0012_approvals.sql`, `0013_payroll_fields.sql` in that order, then
+regenerate `database.types.ts` for real and send it over — the stubs get
+replaced wholesale, not merged alongside.
+
+**Also found, not fixed, flagged here rather than silently left**:
+`apps/ngo/src/app/(app)/leadership/staff/dashboard/` and
+`leadership/staff/tasks/` are byte-identical duplicates of
+`staff/dashboard/` and `staff/tasks/` — confirmed via `diff`, zero output.
+Nothing in the codebase links to `/leadership/staff/dashboard` or
+`/leadership/staff/tasks` (`page-routes.ts` only ever pointed
+`p-staff-dashboard`/`p-staff-tasks` at the top-level `/staff/*` routes), so
+these are dead, unreferenced routes that still build and would still
+render if visited directly. Left alone rather than deleted without being
+asked — worth the user's call on whether to remove them.
+
+`database.types.ts` was, again, genuinely UTF-16LE with CRLF on disk
+(confirmed via `file`, not assumed) — the third time this exact recurrence
+has been caught in this project. Converted to UTF-8/LF before any edits,
+same as the last two times. See docs/LEARNINGS.md — this is evidently a
+standing property of the regeneration workflow, not something that stays
+fixed once corrected.
+
+**New verification step worth keeping going forward**: `packages/core` has
+its own `tsconfig.json` (`npx tsc -p packages/core/tsconfig.json --noEmit`)
+that checks every file in the package, not just what `apps/ngo` happens to
+import. `apps/ngo`'s own `tsc --noEmit` — the check this project has run
+before every build so far — cannot see a file nothing imports, which is
+exactly how `kpi/sessions.ts`'s pre-existing expectations stayed invisible
+until this pass. Running both from now on, not just `apps/ngo`'s, costs
+little and would have caught this collision immediately instead of mid-build.
+
+Verified: `tsc --noEmit` clean in both `apps/ngo` and `packages/core`
+(the latter still carries pre-existing, unrelated errors in dead ported
+type files — `app-user.ts`, `invoice.ts`, `monitor.ts`, `monitor-entry.ts`,
+`org-targets.ts`, `performance-review.ts`, `platform-staff.ts`,
+`staff-kpi.ts`, `staff-target.ts`, `task-event.ts`, `task-stop.ts`,
+`compute.ts` — confirmed pre-existing via `git stash`, not introduced this
+pass, not fixed here since none of them are in scope). `next build` clean,
+37 routes, all 11 new `/hod/*` routes correctly dynamic (ƒ). `eslint`
+clean on every new file.
+
+**Not yet tested against real data** — no live Supabase project in this
+session, so no task/report/media/request has actually been created through
+these pages yet, and Dept Feed/Access Log have no rows to show until
+someone does. Natural next check once the migrations are run: sign in as
+an `hod` account with a department set, create a task and submit a report
+through the new pages, confirm both show up in Dept Feed and Access Log,
+and confirm a second `hod` account in a different department sees none of
+it.
+
+Also added `hod: '/hod/dashboard'` to `ROLE_HOME` in `page-routes.ts` —
+previously missing, same gap already fixed once for `donor`
+(2026-08-19, "Donor portal") — an hod account clicking Home fell through
+to `/coming-soon` until now.
+
+This closes the HOD workspace. Next per the agreed order: HR, 2 pages.
+
+## Open at end of this session (2026-08-26)
+
+**Convention fix, stated plainly since it caused a real problem before**:
+this section previously went stale for a full session because it was left
+in place rather than rewritten. Rewritten for real this time, not just
+re-dated — every line below reflects the state as of this session, not
+copied from the 2026-08-25 version.
+
+**Authoritative source for "what pages are missing"**: not this list — run
+the real gating resolver against every role and cross-reference
 `page-routes.ts`, the same check used in EXECUTION.md's "Backlog
-reckoning" entry (2026-08-19). A hand-maintained bullet list of missing
-pages will go stale the same way this whole section did; the resolver
-script can't lie about what's actually wired. As of 2026-08-25: **17 of
-59 unique NGO pages built, 42 still `/coming-soon`** — Compose Report is
-the last cross-cutting one; HOD (11 pages) and HR (2 pages) are entirely
-unbuilt workspaces.
+reckoning" entry (2026-08-19). As of this session, before HR is picked up:
+**28 of 59 unique NGO pages built, 31 still `/coming-soon`** — the HOD
+workspace (11 pages, this session) is done; HR (2 pages) is the only
+entirely unbuilt workspace left. Re-run the resolver rather than trusting
+this number by eye once HR or anything else changes it.
 
 **Genuinely still open, checked against the real current state, not
 copied from an old list**:
 
 - Task/project write access is org-wide for any non-donor staff member —
   the handover's real rule (leadership org-wide, HOD within department,
-  staff only their own) needs per-row filtering, not implemented.
+  staff only their own) needs per-row filtering, not implemented. The new
+  `/hod/tasks` page narrows what it *shows* to one department via a query
+  filter, but the underlying `tasks_write_by_staff` RLS policy (0005)
+  still lets any non-donor staff member write any task in the org — the
+  page filter is not an RLS boundary, stated here so it isn't mistaken for
+  one.
 - Milestone verification isn't reviewer-gated at the RLS layer —
   `app.is_reviewer()` exists (0003) and is unused on `project_milestones`.
-- Single-project assumption on the two project-related pages — querying
-  "most recent project" rather than supporting multiple.
+- Single-project assumption on the two project-related pages (leadership
+  and now hod) — querying "most recent project" rather than supporting
+  multiple. `/hod/projects` inherits this unchanged, see this session's
+  entry above for why it isn't department-filtered either.
 - Task submission (`staff/tasks/[id]`) is still local-only React state,
   not a real write.
 - No UI for editing/deleting an appointment or a fund line once created;
   same for most other create-only forms built this project — add-only,
   no edit/delete, throughout.
 - `database.types.ts` regenerates as UTF-16LE with CRLF every time,
-  confirmed twice now (see LEARNINGS.md). No automated guard exists yet —
-  still caught by eye each time. Worth a `postinstall`/`predev` script
-  that normalizes it automatically rather than relying on remembering to
-  check.
+  confirmed a third time this session (see LEARNINGS.md). No automated
+  guard exists yet — still caught by eye each time. Worth a
+  `postinstall`/`predev` script that normalizes it automatically rather
+  than relying on remembering to check, given it has now recurred on three
+  separate occasions.
 - Messages has no read-receipt, edit, or unsend — immutable by design for
   v1, not a bug, but worth knowing before assuming it's a full messaging
   feature.
+- **Requests (`/hod/requests`) has no review flow** — `approvals` (0012)
+  has no update policy, so a request can be filed but never move out of
+  `pending`. The leadership Approvals / Disbursement Queue page
+  (`p-lead-approvals`) that would review these doesn't exist yet either.
+  Deliberate v1 scope, not a bug — see this session's entry above.
+- **Payroll (`/hod/payroll`) has no way to set salary structure from the
+  UI** — `basic_salary`/`housing_allowance`/etc. (0013) can only be set via
+  SQL right now. Not an oversight: `employees_update_by_hr` (0003)
+  correctly excludes `hod` from writing to `employees`, so the natural
+  owner of that UI is Staff Management (leadership/hr/admin), not this
+  page — a real future addition, not built here.
+- **Payroll has no run history** — PAYE is computed on read from whatever
+  the salary columns hold right now; there is no persisted "payslip for
+  March 2026" that stays fixed once computed. Fine for "what would this
+  person's pay look like today," not for "what did we actually pay in a
+  past period." A real payroll-run table is the future fix if that
+  question ever needs answering.
+- **`activity_events` (0011) is sparsely populated** — only Tasks
+  (`/hod/tasks`) and Submit Report (`/hod/submit`) write to it so far.
+  Every other write path in the app (leadership's tasks/projects/media,
+  appointments, messages, staff's task submission) doesn't log here, so
+  Dept Feed and Access Log will only ever show a fraction of what actually
+  happens in a department. Wiring more write paths to it, and building the
+  Timeline (leadership) and Team Feed (staff) pages that are meant to read
+  the same table, is real future work, not done in this pass.
+- **Two dead, unreferenced duplicate routes found this session, not
+  removed**: `apps/ngo/src/app/(app)/leadership/staff/dashboard/` and
+  `leadership/staff/tasks/` are byte-identical copies of `staff/dashboard/`
+  and `staff/tasks/`, reachable by URL but linked from nowhere in the app.
+  Left in place rather than deleted without being asked — worth the user
+  deciding whether to remove them.
 - `docs/INTERFACE.md` still on hold — color scheme to be decided against
   the legacy screenshots before any real UI/visual work.
