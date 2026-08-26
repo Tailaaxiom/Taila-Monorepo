@@ -29,7 +29,7 @@ apps/ngo/src/
   lib/auth/       identity.ts, setup-tokens.ts, RealCurrentUserProvider.tsx
   lib/fixtures/   NGO-specific sample/test data — NOT in packages/core, see below
 
-supabase/migrations/   0001-0013 so far, run in order, SQL Editor, one at a time
+supabase/migrations/   0001-0014 so far, run in order, SQL Editor, one at a time
 docs/                  EXECUTION.md, LEARNINGS.md, INTERFACE.md
 ```
 
@@ -154,7 +154,7 @@ cross-reference `page-routes.ts`. See EXECUTION.md's "Backlog reckoning"
 (2026-08-19) entry for the exact script. Re-run it rather than trusting
 any prose list, including this file's, before treating a count as current.
 
-## Known open gaps, current as of 2026-08-26 (see EXECUTION.md for detail)
+## Known open gaps, current as of 2026-08-26, HR workspace session (see EXECUTION.md for detail)
 
 - Task/project write access is org-wide for any non-donor staff member —
   the handover's real rule (leadership org-wide, HOD within department,
@@ -165,32 +165,47 @@ any prose list, including this file's, before treating a count as current.
 - Milestone verification isn't reviewer-gated at the RLS layer —
   `app.is_reviewer()` exists and is unused on `project_milestones`.
 - Single-project assumption on the project-related pages (leadership and
-  now hod) — querying "most recent project" rather than supporting
-  multiple.
+  hod) — querying "most recent project" rather than supporting multiple.
 - Task submission (`staff/tasks/[id]`) is still local-only React state, not
   a real write.
-- `database.types.ts` regenerates as UTF-16LE with CRLF every time it's
-  produced, confirmed a third time now (see LEARNINGS.md, including a real
-  incident where a GitHub-UI merge silently emptied the file because of
-  it). No automated normalization exists yet — treat this as a standing
-  property of the regeneration workflow, not a one-time fix, and check
+- `database.types.ts` regenerated as UTF-16LE with CRLF three separate
+  times before this session (see LEARNINGS.md, including a real incident
+  where a GitHub-UI merge silently emptied the file because of it) — did
+  not recur this session (checked with `file`, was already UTF-8), but no
+  automated normalization exists yet. Treat this as a standing property of
+  the regeneration workflow, not something fixed for good, and check
   `file` on it every session that touches it.
 - Requests (`/hod/requests`) has no review flow — `approvals` (0012) has no
   update policy; a leadership Approvals/Disbursement Queue page to review
   requests doesn't exist yet. Deliberate v1 scope, not a bug.
-- Payroll (`/hod/payroll`) is read-only and has no run history — salary
-  structure can only be set via SQL (by design: `employees_update_by_hr`,
-  0003, correctly excludes hod), and PAYE is computed fresh on every read
-  rather than persisted per period.
+- Payroll (`/hod/payroll`) has no run history — PAYE is computed fresh on
+  every read from whatever the salary columns currently hold, not
+  persisted per period. Salary structure itself **can** now be set through
+  the app (Staff Management, this session) — the read-only/SQL-only gap
+  logged previously is closed.
+- `performance_reviews` (0014) write access isn't attributed at the RLS
+  layer — any leadership/hr/admin account can write a review under any
+  `reviewer_code`, including someone else's; the client sets it from the
+  signed-in session but the database doesn't assert it the way
+  `messages.sender_code` does. Whether an employee should ever read their
+  own review is also an open question the handover doesn't answer —
+  neither built, both real gaps.
 - `activity_events` (0011) is sparsely populated — only the HOD Tasks and
   Submit Report pages write to it so far. Dept Feed and Access Log will
   only show a fraction of real department activity until more write paths
   (and the future Timeline/staff Team Feed pages) are wired to it.
+- A Supabase `.select(...)` argument must be one string literal, never
+  built by `+` concatenation — doing so silently widens its type to plain
+  `string`, which collapses the query's inferred return type to
+  postgrest-js's `GenericStringError` instead of the real row shape. See
+  LEARNINGS.md for the full diagnostic; the fix is just writing it as one
+  (possibly long) literal.
 - Two dead, unreferenced duplicate routes exist:
   `leadership/staff/dashboard/` and `leadership/staff/tasks/` are
   byte-identical copies of `staff/dashboard/`/`staff/tasks/`, linked from
   nowhere. Found, not removed — flagged for the user to decide.
-- 31 of 59 unique NGO pages are still `/coming-soon` as of the last check
-  — HR (2 pages) is the only entirely unbuilt workspace left. This number
-  goes stale the moment another page ships; re-run the check above rather
-  than trusting it here.
+- 28 of 59 unique NGO pages are still `/coming-soon` as of the last check
+  (31 built) — every remaining one is leadership-specialized or
+  platform-admin; no workspace is entirely unbuilt anymore. This number
+  goes stale the moment another page ships; re-run the resolver script
+  described above rather than trusting it here.

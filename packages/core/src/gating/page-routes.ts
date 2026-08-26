@@ -28,6 +28,8 @@ const PAGE_ROUTES: Record<string, string> = {
   'p-hod-projects': '/hod/projects',
   'p-hod-requests': '/hod/requests',
   'p-hod-media': '/hod/media',
+  'p-hr-dashboard': '/hr/dashboard',
+  'p-hr-reviews': '/hr/reviews',
 };
 
 const ROLE_HOME: Record<string, string> = {
@@ -37,9 +39,11 @@ const ROLE_HOME: Record<string, string> = {
   // Previously missing, same gap already fixed once for donor (see
   // docs/EXECUTION.md, "Donor portal") — an hod account clicking Home fell
   // through to /coming-soon until the HOD workspace gave it somewhere real
-  // to land. finance/hr/admin still have no home page of their own; not
-  // fixed here since none of them gained one in this pass.
+  // to land. Same fix again here for hr, now that it has a real page too.
+  // finance/admin still have no home page of their own; not fixed here
+  // since neither gained one in this pass.
   hod: '/hod/dashboard',
+  hr: '/hr/dashboard',
 };
 
 export function routeForPage(pageId: string, role: string): string {

@@ -1099,84 +1099,241 @@ to `/coming-soon` until now.
 
 This closes the HOD workspace. Next per the agreed order: HR, 2 pages.
 
-## Open at end of this session (2026-08-26)
+## 2026-08-26 — HR workspace (2 pages), and the salary-structure gap that was the real point
+
+**Re-ran the actual resolver script this time, not a hand count.** The
+previous entry's "28 of 59" was wrong — verified by writing and running a
+real script (`getNavItems()` against the same NGO fixture used since
+2026-08-18, every role, cross-referenced against `routeForPage()`), not
+estimated: the real number going into this session was **29 of 59 built**.
+Full per-role output, captured before any code changed this session:
+
+```
+staff:      12 nav items,  5 built,  7 coming-soon
+hod:        16 nav items, 15 built,  1 coming-soon  (p-lead-templates)
+leadership: 34 nav items, 13 built, 21 coming-soon
+donor:       4 nav items,  4 built,  0 coming-soon
+finance:    13 nav items,  7 built,  6 coming-soon
+admin:      11 nav items,  0 built, 11 coming-soon
+hr:         10 nav items,  6 built,  4 coming-soon  (p-hr-dashboard,
+             p-hr-reviews, p-lead-delivery, p-lead-access coming-soon)
+
+TOTALS: 69 unique page ids reachable by some role, 29 built, 40 coming-soon
+```
+
+The historical "59 unique NGO pages" denominator excludes `admin`'s 10
+platform-admin-only ids (`p-admin-*`; `p-lead-templates` is shared so
+doesn't add a new one) — `69 − 10 = 59`, and since none of admin's ids are
+built, the correction is exact: **29 of 59, not 28**. The script itself
+isn't committed anywhere (run from the scratchpad, not part of the repo) —
+worth reconstructing again next time rather than trusting either number by
+eye, per the standing rule.
+
+Cross-referenced `NAVMAP.hr` against `page-routes.ts` the same way: most
+of what `hr` reaches was already built and shared (`p-lead-staff`,
+`p-lead-add-staff`, `p-search`, `p-messages`, `p-appointments`,
+`p-compose`) — only `p-hr-dashboard` (HR Overview) and `p-hr-reviews`
+(Performance Reviews) were genuinely new, matching the task brief exactly.
+
+**Built first, before either new page — the actual reason this batch
+exists**: salary-structure editing on Staff Management
+(`leadership/staff/`). The six columns `0013_payroll_fields.sql` added for
+HOD Payroll (`basic_salary`, `housing_allowance`, `transport_allowance`,
+`other_allowances`, `annual_rent`, `nhf_opt_in`) had no UI anywhere —
+SQL-only, meaning Payroll could never be exercised through the app.
+Verified the real policy name first rather than assuming it (the task
+brief specifically flagged that `employees_update_by_hr` had gone
+unverified in the HOD session's own summary): confirmed at
+`0003_auth_and_rls.sql:169`, real, scoped to `leadership/hr/admin` on both
+`USING` and `WITH CHECK`. That's an exact match for the six new columns'
+needs, so **no new migration** — `page.tsx`'s select and
+`StaffManagementClient.tsx` were extended with an inline per-row "Edit
+salary" form (collapsible, one row per employee) that writes through the
+same RLS-scoped update the page already used for other employee edits.
+
+**Real bug hit and fixed in the process, worth its own note**: writing the
+extended `.select(...)` call as a string built with `+` concatenation
+(`'a, b, c, ' + 'd, e, f'`) broke Supabase's compile-time column-type
+inference — `apps/ngo`'s `tsc` failed with `Conversion of type
+'GenericStringError[]' to type 'EmployeeListItem[]' may be a mistake`.
+Fixed by writing the select list as a single string literal instead.
+See docs/LEARNINGS.md for the general lesson — this is exactly the kind of
+thing worth a real entry, not a promised one.
+
+**New table** — `0014_performance_reviews.sql`. No handover or ported-type
+guidance on its shape existed (`packages/core/src/types/performance-review.ts`
+was a dead stub with zero columns, unlike `approval.ts`, which at least had
+`req_items`'s shape to go on) — designed fresh from the task brief's own
+description ("review records per employee"): `employee_code`/
+`employee_name` and `reviewer_code`/`reviewer_name` denormalized pairs
+(matching `summary_reports.author_code`/`author_name`), `period`, `rating
+numeric(3,1)`, `strengths`/`areas_for_growth`/`notes` free text, `status`
+(`draft`/`submitted`, same enum shape as `summary_reports.status`).
+
+**RLS deliberately breaks from the org-wide v1 shape used for every other
+table this project** (tasks, appointments, summary_reports,
+activity_events, approvals — any non-donor staff reads/writes any row).
+Performance reviews are personal and sensitive, and the handover scopes
+this page to HR specifically. Both `select` and the write policy restrict
+to `app.is_staff_of(org_id) and app.role() in ('leadership','hr','admin')`
+— the same role set as `employees_update_by_hr`, and the same *shape* of
+restriction already used once before for `income`/`expenses`/`funders`
+(just a different three roles: `leadership/finance/admin` there). Whether
+an employee should eventually read their own review is a real open
+question the handover doesn't answer — not built, stated as a gap, not
+silently decided either way.
+
+No Supabase credentials in this session (`npx supabase projects list`
+still fails with `LegacyPlatformAuthRequiredError`), same as every new
+table before it — `0014_performance_reviews.sql` is written and reviewed
+but not run. PROVISIONAL stub added to `database.types.ts`, built by
+comparing against `summary_reports` (structurally closest real table),
+clearly labeled. **Action for the user**: run
+`0014_performance_reviews.sql`, regenerate `database.types.ts` for real,
+send it over — the stub gets replaced wholesale, not merged alongside.
+`database.types.ts` was genuinely UTF-8 already at the start of this
+session (checked with `file` before touching it, not assumed) — the
+UTF-16LE recurrence did not happen a fourth time this pass.
+
+**Pages**:
+- **HR Overview** (`/hr/dashboard`) — read-only: headcount, department
+  spread (active employees grouped by department), review status (counts
+  by `draft`/`submitted`, most recent 8), recent joiners (5 most recently
+  created). Reads `employees` (org-wide read, `employees_read_org`) and
+  `performance_reviews` (HR-restricted, matching this page's own role
+  gate). Split into server page + presentational client component even
+  though there's zero interactivity — same call already made for HOD's
+  Team Summaries: the standing rule is the split itself, not "only when
+  there's a form."
+- **Performance Reviews** (`/hr/reviews`) — read + write: create-review
+  form (employee code, period, rating 1–5, strengths, areas for growth,
+  notes, draft/submitted) plus a list of all reviews. Reviewer identity
+  (`reviewer_code`/`reviewer_name`) comes from the signed-in session, not
+  a form field — same "asserted by the server, not trusted from the
+  client" spirit as every other denormalized-actor table, though RLS here
+  doesn't yet enforce reviewer_code = app.employee_code() the way
+  messages.sender_code does; any HR/leadership/admin account can write a
+  review as if authored by any other HR account. Not tightened here since
+  the handover doesn't call for per-reviewer attribution to be
+  security-enforced, just noted as a real gap rather than assumed covered.
+
+Also added `hr: '/hr/dashboard'` to `ROLE_HOME` in `page-routes.ts` — same
+gap already fixed twice before (`donor`, then `hod`) — an hr account
+clicking Home fell through to `/coming-soon` until now.
+
+Verified: `tsc --noEmit` clean in both `apps/ngo` and `packages/core`'s
+own standalone tsconfig (16 pre-existing, unrelated errors in dead
+ported-type files, confirmed identical to the HOD session's own confirmed
+baseline — no new ones, no `performance-review.ts` error now that its
+table exists). `next build` clean, 39 routes, both `/hr/*` routes and the
+unchanged `/leadership/staff` route all correctly dynamic (ƒ). `eslint`
+clean on every new and changed file.
+
+**Re-ran the resolver script one more time after building**, same
+methodology: **31 of 59 unique NGO pages built, 28 still coming-soon.**
+`hr` itself: 8 of 10 nav items built — only `p-lead-delivery` and
+`p-lead-access` remain, both shared leadership-facing pages out of scope
+for this batch (already tracked as open gaps elsewhere).
+
+**Not yet tested against real data** — no live Supabase project in this
+session, so no salary structure, review, or anything else has actually
+been saved through these forms yet. Natural next check once
+`0014_performance_reviews.sql` is run: set a salary structure on an
+employee through the new Staff Management form, confirm the HOD Payroll
+page (`/hod/payroll`) picks it up and computes a real PAYE breakdown
+instead of showing "No salary structure set"; create a review through
+`/hr/reviews`, confirm it shows up on `/hr/dashboard`'s review-status
+card; confirm a `staff`/`hod` account cannot reach `/hr/reviews` or query
+`performance_reviews` directly.
+
+This closes the agreed backlog order (cross-cutting → HOD → HR). 28
+NGO-relevant pages remain coming-soon, all leadership-specialized or
+platform-admin at this point — no other entirely-unbuilt workspace is
+left.
+
+## Open at end of this session (2026-08-26, HR workspace)
 
 **Convention fix, stated plainly since it caused a real problem before**:
-this section previously went stale for a full session because it was left
-in place rather than rewritten. Rewritten for real this time, not just
-re-dated — every line below reflects the state as of this session, not
-copied from the 2026-08-25 version.
+this section must be rewritten, not re-dated, every time it's touched. The
+previous version of this section (from the HOD session) hand-typed "28 of
+59" without re-running the resolver — the real number at that exact point
+was 29/59, caught only when this session actually ran the script instead
+of trusting the prior entry. That's precisely the failure mode this
+convention exists to prevent, and it still happened once more. Treat every
+number in this section as needing its own fresh check, not inherited from
+the entry above it.
 
 **Authoritative source for "what pages are missing"**: not this list — run
 the real gating resolver against every role and cross-reference
-`page-routes.ts`, the same check used in EXECUTION.md's "Backlog
-reckoning" entry (2026-08-19). As of this session, before HR is picked up:
-**28 of 59 unique NGO pages built, 31 still `/coming-soon`** — the HOD
-workspace (11 pages, this session) is done; HR (2 pages) is the only
-entirely unbuilt workspace left. Re-run the resolver rather than trusting
-this number by eye once HR or anything else changes it.
+`page-routes.ts` (script not committed anywhere in the repo; rewrite it
+from `getNavItems()`/`NAVMAP`/`routeForPage()` and the NGO fixture
+described in the 2026-08-18 entry, same as this session and the
+2026-08-19 "Backlog reckoning" entry did). As of this session, freshly
+re-run after the HR workspace: **31 of 59 unique NGO pages built, 28 still
+`/coming-soon`**. HOD and HR are both done; every remaining coming-soon
+page is either leadership-specialized or platform-admin (`p-admin-*`,
+excluded from the 59 denominator entirely — see this session's entry
+above for the exact reconciliation). No workspace is entirely unbuilt
+anymore.
 
 **Genuinely still open, checked against the real current state, not
 copied from an old list**:
 
 - Task/project write access is org-wide for any non-donor staff member —
   the handover's real rule (leadership org-wide, HOD within department,
-  staff only their own) needs per-row filtering, not implemented. The new
-  `/hod/tasks` page narrows what it *shows* to one department via a query
-  filter, but the underlying `tasks_write_by_staff` RLS policy (0005)
-  still lets any non-donor staff member write any task in the org — the
-  page filter is not an RLS boundary, stated here so it isn't mistaken for
-  one.
+  staff only their own) needs per-row filtering, not implemented. The
+  HOD workspace's department-scoped pages filter what they *show* at the
+  query level; the underlying RLS policies still permit any non-donor
+  staff member to write any row — a page filter, not an RLS boundary.
 - Milestone verification isn't reviewer-gated at the RLS layer —
   `app.is_reviewer()` exists (0003) and is unused on `project_milestones`.
-- Single-project assumption on the two project-related pages (leadership
-  and now hod) — querying "most recent project" rather than supporting
-  multiple. `/hod/projects` inherits this unchanged, see this session's
-  entry above for why it isn't department-filtered either.
+- Single-project assumption on the project-related pages (leadership and
+  hod) — querying "most recent project" rather than supporting multiple.
 - Task submission (`staff/tasks/[id]`) is still local-only React state,
   not a real write.
 - No UI for editing/deleting an appointment or a fund line once created;
   same for most other create-only forms built this project — add-only,
   no edit/delete, throughout.
-- `database.types.ts` regenerates as UTF-16LE with CRLF every time,
-  confirmed a third time this session (see LEARNINGS.md). No automated
-  guard exists yet — still caught by eye each time. Worth a
-  `postinstall`/`predev` script that normalizes it automatically rather
-  than relying on remembering to check, given it has now recurred on three
-  separate occasions.
+- `database.types.ts` regenerated as UTF-16LE with CRLF three separate
+  times before this session (see LEARNINGS.md) — genuinely UTF-8 already
+  at the start of this one, so it did not recur a fourth time, but no
+  automated guard exists yet. Still worth a `postinstall`/`predev` script
+  that normalizes it automatically rather than relying on remembering to
+  check every session.
 - Messages has no read-receipt, edit, or unsend — immutable by design for
   v1, not a bug, but worth knowing before assuming it's a full messaging
   feature.
-- **Requests (`/hod/requests`) has no review flow** — `approvals` (0012)
-  has no update policy, so a request can be filed but never move out of
+- Requests (`/hod/requests`) has no review flow — `approvals` (0012) has no
+  update policy, so a request can be filed but never move out of
   `pending`. The leadership Approvals / Disbursement Queue page
   (`p-lead-approvals`) that would review these doesn't exist yet either.
-  Deliberate v1 scope, not a bug — see this session's entry above.
-- **Payroll (`/hod/payroll`) has no way to set salary structure from the
-  UI** — `basic_salary`/`housing_allowance`/etc. (0013) can only be set via
-  SQL right now. Not an oversight: `employees_update_by_hr` (0003)
-  correctly excludes `hod` from writing to `employees`, so the natural
-  owner of that UI is Staff Management (leadership/hr/admin), not this
-  page — a real future addition, not built here.
-- **Payroll has no run history** — PAYE is computed on read from whatever
-  the salary columns hold right now; there is no persisted "payslip for
-  March 2026" that stays fixed once computed. Fine for "what would this
-  person's pay look like today," not for "what did we actually pay in a
-  past period." A real payroll-run table is the future fix if that
-  question ever needs answering.
-- **`activity_events` (0011) is sparsely populated** — only Tasks
-  (`/hod/tasks`) and Submit Report (`/hod/submit`) write to it so far.
-  Every other write path in the app (leadership's tasks/projects/media,
-  appointments, messages, staff's task submission) doesn't log here, so
-  Dept Feed and Access Log will only ever show a fraction of what actually
-  happens in a department. Wiring more write paths to it, and building the
-  Timeline (leadership) and Team Feed (staff) pages that are meant to read
-  the same table, is real future work, not done in this pass.
-- **Two dead, unreferenced duplicate routes found this session, not
-  removed**: `apps/ngo/src/app/(app)/leadership/staff/dashboard/` and
-  `leadership/staff/tasks/` are byte-identical copies of `staff/dashboard/`
-  and `staff/tasks/`, reachable by URL but linked from nowhere in the app.
-  Left in place rather than deleted without being asked — worth the user
-  deciding whether to remove them.
+  Deliberate v1 scope, not a bug.
+- **Payroll (`/hod/payroll`) can now be exercised through the app** — the
+  salary-structure gap this session's own entry describes closing is
+  genuinely closed, not partially: Staff Management can set the six salary
+  columns, Payroll computes real PAYE against them. Still has **no run
+  history** — PAYE is computed fresh on every read from whatever the
+  columns hold right now, no persisted "payslip for March 2026" that stays
+  fixed once computed. A real payroll-run table is the future fix if "what
+  did we actually pay in a past period" ever needs answering.
+- `activity_events` (0011) is sparsely populated — only HOD Tasks and
+  Submit Report write to it so far. Dept Feed and Access Log will only
+  show a fraction of real department activity until more write paths (and
+  the future Timeline/staff Team Feed pages) are wired to it.
+- **`performance_reviews` (0014) write access isn't attributed at the RLS
+  layer** — any leadership/hr/admin account can write a review with any
+  `reviewer_code`, including someone else's; the field is set from the
+  signed-in session client-side but not asserted server-side the way
+  `messages.sender_code` is. Not tightened here since the handover doesn't
+  call for it, but worth knowing before assuming reviewer attribution is
+  trustworthy against a malicious HR account.
+- Whether an employee should ever read their own performance review is a
+  real open question the handover doesn't answer. Not built — deliberately
+  left open rather than guessed at either way.
+- Two dead, unreferenced duplicate routes exist:
+  `leadership/staff/dashboard/` and `leadership/staff/tasks/` are
+  byte-identical copies of `staff/dashboard/`/`staff/tasks/`, linked from
+  nowhere. Found last session, still not removed — flagged for the user to
+  decide.
 - `docs/INTERFACE.md` still on hold — color scheme to be decided against
   the legacy screenshots before any real UI/visual work.

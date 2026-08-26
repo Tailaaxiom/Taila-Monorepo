@@ -448,3 +448,57 @@ or table to `packages/core`, especially one whose name might plausibly
 already be expected by ported-but-unwired legacy logic, run
 `packages/core`'s own tsconfig too — it costs one extra command and would
 have caught this immediately instead of via a coincidental grep.
+
+
+## Concatenating a Supabase .select() string with `+` silently breaks its return type
+
+Extending Staff Management's employee query to also fetch the six new
+salary columns (2026-08-26, HR workspace session), the natural-looking
+edit was to build the longer select list as two string literals joined
+with `+`:
+
+```ts
+.select(
+  'id, employee_code, full_name, ..., created_at, ' +
+    'basic_salary, housing_allowance, ..., nhf_opt_in',
+)
+```
+
+`apps/ngo`'s `tsc --noEmit` failed immediately, but not with a missing- or
+wrong-column error — with `Conversion of type 'GenericStringError[]' to
+type 'EmployeeListItem[]' may be a mistake because neither type
+sufficiently overlaps with the other`. The column names were all correct;
+every one of them is a real column on `employees`.
+
+**Root cause**: the typed Supabase client (`@supabase/postgrest-js`, via
+the `Database` generic) infers a query's return row shape by parsing the
+literal string type of the argument passed to `.select()` at compile
+time — it reads the actual characters of the string literal to figure out
+which columns come back. That only works when TypeScript can see the
+argument as a specific string literal type. `'a, b' + 'c, d'` does
+type-check as a value, but its *type* widens to the general `string`, not
+the two literals concatenated — a well-known TypeScript behavior (`+` on
+two string literals produces `string`, not a new literal, unless the
+whole expression is a single template literal or a single literal). With
+the argument typed as plain `string`, postgrest-js's select-string parser
+has nothing to parse and falls back to its own `GenericStringError` error
+type, which is what actually showed up in the query result — a type
+carrying no real columns at all.
+
+**Fixed by writing the same list as one literal string** instead of two
+concatenated pieces — a long line, but one whose type-checker sees the
+exact select list, not `string`. A template literal (`` `a, b, ${x}` ``)
+would have the same problem for anything but a fully static string, since
+interpolation also widens to `string` unless every interpolated piece is
+itself a literal.
+
+**The general lesson**: with this project's typed Supabase client, a
+`.select(...)` argument must be authored as a single string literal, not
+built by concatenation, a helper function, or anything else that could
+widen its type to plain `string` — doing so doesn't just lose autocomplete,
+it silently collapses the entire query's return type to an error type that
+still type-checks as assignable-with-a-cast, producing exactly the
+confusing "may be a mistake" cast error seen here rather than an obviously
+related one. If a select list needs to be long, break it across lines
+inside one literal (as this fix does) rather than joining separate
+literals.
