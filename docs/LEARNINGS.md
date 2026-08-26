@@ -360,3 +360,91 @@ Recovered by pulling the known-good blob directly from the commit that
 introduced the real content (`git show <sha>:<path>`), not by
 re-requesting a fresh regeneration — the correct bytes already existed in
 history, they'd just been dropped by the merge, not lost.
+
+
+## database.types.ts's UTF-16LE recurrence, a third time (2026-08-26)
+
+Found genuinely UTF-16LE with CRLF again at the start of the HOD workspace
+session — the third time this has been caught (first "fixed for real" on
+2026-08-19, recurred and was fixed again on 2026-08-25, now a third time).
+`file <path>` confirmed it directly, not inferred. Converted the same way
+as both previous times (`iconv -f UTF-16LE -t UTF-8`, BOM and `\r`
+stripped, verified by `file` and `wc -l` afterward) before making any
+edits to the file.
+
+**The pattern is now the lesson, not any single fix**: this is not a
+one-off mistake that gets "fixed for real" and stays fixed — it is a
+standing property of however `supabase gen types` gets run and committed
+on the machine that produces it (almost certainly Windows, per the earlier
+entries). Every session that touches `database.types.ts` — reading it,
+editing it, or just before trusting a build result that depends on it —
+should run `file` on it first and convert if needed, as routine, not as a
+one-time cleanup. Relying on "it was converted last session" has been
+wrong twice now.
+
+
+## A pre-existing, unused file in packages/core can already be committed to a schema nobody told you about
+
+Adding `0011_activity_events.sql` and its type file went smoothly through
+`apps/ngo`'s own `tsc --noEmit` and `next build` — both came back clean.
+Only running `packages/core`'s own standalone `npx tsc -p
+packages/core/tsconfig.json --noEmit` (which type-checks every file in the
+package, not just the ones `apps/ngo` actually imports) surfaced
+`packages/core/src/kpi/sessions.ts` failing with missing-property errors
+against the exact new type just added.
+
+That file — `buildSessions()`, computing work sessions from login/logout
+events — was ported wholesale into `packages/core` during the original
+monorepo restructure (2026-08-18) alongside `tasks/status`,
+`projects/milestones`, and `finance/invoice-matching`, and has been
+sitting completely unused ever since: nothing in `apps/ngo` imports it, so
+`apps/ngo`'s own `tsc` never traverses into it and never could have caught
+anything wrong with it. It already contained `import type { ActivityEvent
+} from '../types/activity-event'` and already expected that type to carry
+`user_code`, `user_name`, and `role` fields for building
+`'login'`/`'logout'` sessions.
+
+**Correction, caught by `git status` after the fact, not assumed
+correctly the first time**: this entry originally claimed the
+`../types/activity-event` module "didn't exist until this session created
+it." That's wrong. `packages/core/src/types/activity-event.ts` was
+already tracked in git, part of the initial commit — one more of a whole
+family of dormant ported type files (alongside `task-event.ts`,
+`task-stop.ts`, `staff-kpi.ts`, `staff-target.ts`, `org-targets.ts`,
+`monitor.ts`, `monitor-entry.ts`, `performance-review.ts`,
+`platform-staff.ts`, `app-user.ts`, `invoice.ts` — all still broken today,
+still waiting on real tables) shipped from day one against legacy tables
+that had no migration yet, the same category `approval.ts` turned out to
+be before this session gave it a real table too. This session's own Write
+call overwrote that pre-existing file without reading it first — against
+this project's own stated tool discipline — and only `git status` showing
+it as modified (`M`) rather than new (`??`) surfaced the mistake. Checked
+the diff afterward: functionally identical, just reformatted (blank lines,
+an expanded function body, one added comment), so nothing was lost this
+time — but that was luck from writing the same obvious shape twice, not a
+property of the process. **The corrected story**: the table
+(`activity_events`) was genuinely new and freshly designed this session;
+the *type file* wrapping it was not, and neither was `kpi/sessions.ts`'s
+expectation of what columns it would carry. By coincidence of naming, a
+table this session was about to design from scratch had already been
+committed to, twice over, by dormant legacy code nobody mentioned.
+**Practical rule**: before writing a new file into `packages/core/src`,
+check whether it already exists — a stale assumption that a path is free
+is exactly how a real pre-existing file gets silently clobbered.
+
+Reconciled by renaming the new table's columns
+(`actor_code`/`actor_name` → `user_code`/`user_name`, plus a new `role`
+column) to match what the pre-existing consumer already expected, rather
+than leaving two different shapes fighting over the same table name or
+quietly shipping a table that would keep `kpi/sessions.ts` permanently
+broken.
+
+**The general lesson**: `apps/ngo`'s `tsc --noEmit` being clean is not
+proof that everything in `packages/core` is fine — it only proves what
+`apps/ngo` actually reaches. A file with zero importers can sit broken (or,
+as here, sit correct-but-unsatisfied) indefinitely without any check in
+this project's normal workflow ever looking at it. When adding a new type
+or table to `packages/core`, especially one whose name might plausibly
+already be expected by ported-but-unwired legacy logic, run
+`packages/core`'s own tsconfig too — it costs one extra command and would
+have caught this immediately instead of via a coincidental grep.
