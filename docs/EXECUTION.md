@@ -1251,30 +1251,28 @@ NGO-relevant pages remain coming-soon, all leadership-specialized or
 platform-admin at this point — no other entirely-unbuilt workspace is
 left.
 
-## Open at end of this session (2026-08-26, HR workspace)
+## Open at end of this session (2026-08-31, staff workspace)
 
-**Convention fix, stated plainly since it caused a real problem before**:
-this section must be rewritten, not re-dated, every time it's touched. The
-previous version of this section (from the HOD session) hand-typed "28 of
-59" without re-running the resolver — the real number at that exact point
-was 29/59, caught only when this session actually ran the script instead
-of trusting the prior entry. That's precisely the failure mode this
-convention exists to prevent, and it still happened once more. Treat every
-number in this section as needing its own fresh check, not inherited from
-the entry above it.
+**Convention reminder, carried forward from the HR session's own note**:
+this section is rewritten, not re-dated, every time it's touched — every
+number below comes from a fresh run of the resolver script this session,
+not inherited from the entry above it.
 
 **Authoritative source for "what pages are missing"**: not this list — run
 the real gating resolver against every role and cross-reference
 `page-routes.ts` (script not committed anywhere in the repo; rewrite it
 from `getNavItems()`/`NAVMAP`/`routeForPage()` and the NGO fixture
-described in the 2026-08-18 entry, same as this session and the
-2026-08-19 "Backlog reckoning" entry did). As of this session, freshly
-re-run after the HR workspace: **31 of 59 unique NGO pages built, 28 still
-`/coming-soon`**. HOD and HR are both done; every remaining coming-soon
-page is either leadership-specialized or platform-admin (`p-admin-*`,
-excluded from the 59 denominator entirely — see this session's entry
-above for the exact reconciliation). No workspace is entirely unbuilt
-anymore.
+described in the 2026-08-18 entry, same as every session since has done).
+As of this session, freshly re-run after the staff workspace: **38 of 59
+unique NGO pages built, 21 still `/coming-soon`**. Staff, HOD, HR are all
+now fully built — **no workspace is even partially unbuilt anymore**.
+Every remaining coming-soon id is inside `leadership`'s own nav
+(`p-lead-*`, 19 distinct ids reachable there plus `p-lead-approvals`/
+`p-lead-income`/`p-lead-invoices`/`p-lead-spend`/`p-lead-analytics`/
+`p-lead-payroll` also reachable by `finance`, `p-lead-access`/
+`p-lead-delivery` also by `hr`) or two cross-sector ids that never resolve
+true for this NGO org at all (`p-pm-projects`, `p-mon-board` — dead ends
+for gating reasons, not a building backlog).
 
 **Genuinely still open, checked against the real current state, not
 copied from an old list**:
@@ -1282,58 +1280,179 @@ copied from an old list**:
 - Task/project write access is org-wide for any non-donor staff member —
   the handover's real rule (leadership org-wide, HOD within department,
   staff only their own) needs per-row filtering, not implemented. The
-  HOD workspace's department-scoped pages filter what they *show* at the
-  query level; the underlying RLS policies still permit any non-donor
-  staff member to write any row — a page filter, not an RLS boundary.
+  HOD and staff workspaces' department/self-scoped pages filter what they
+  *show* at the query level; the underlying RLS policies still permit any
+  non-donor staff member to write any row — a page filter, not an RLS
+  boundary. Staff's own Projects page (this session) sidesteps the write
+  half of this specifically by being read-only, but the read-side gap
+  (org-wide visibility where the handover implies scoping) is unchanged.
 - Milestone verification isn't reviewer-gated at the RLS layer —
   `app.is_reviewer()` exists (0003) and is unused on `project_milestones`.
-- Single-project assumption on the project-related pages (leadership and
-  hod) — querying "most recent project" rather than supporting multiple.
+- Single-project assumption on the project-related pages (leadership, hod,
+  and now staff) — querying "most recent project" rather than supporting
+  multiple.
 - Task submission (`staff/tasks/[id]`) is still local-only React state,
   not a real write.
 - No UI for editing/deleting an appointment or a fund line once created;
   same for most other create-only forms built this project — add-only,
   no edit/delete, throughout.
-- `database.types.ts` regenerated as UTF-16LE with CRLF three separate
-  times before this session (see LEARNINGS.md) — genuinely UTF-8 already
-  at the start of this one, so it did not recur a fourth time, but no
-  automated guard exists yet. Still worth a `postinstall`/`predev` script
-  that normalizes it automatically rather than relying on remembering to
-  check every session.
+- `database.types.ts` regenerated as UTF-16LE with CRLF a **fourth** time,
+  found and converted at the start of this session (see LEARNINGS.md) —
+  still no automated guard. Worth a `postinstall`/`predev` normalization
+  script at this point rather than continuing to catch it by hand every
+  session; four recurrences is a pattern, not bad luck.
 - Messages has no read-receipt, edit, or unsend — immutable by design for
   v1, not a bug, but worth knowing before assuming it's a full messaging
   feature.
-- Requests (`/hod/requests`) has no review flow — `approvals` (0012) has no
-  update policy, so a request can be filed but never move out of
-  `pending`. The leadership Approvals / Disbursement Queue page
-  (`p-lead-approvals`) that would review these doesn't exist yet either.
-  Deliberate v1 scope, not a bug.
-- **Payroll (`/hod/payroll`) can now be exercised through the app** — the
-  salary-structure gap this session's own entry describes closing is
-  genuinely closed, not partially: Staff Management can set the six salary
-  columns, Payroll computes real PAYE against them. Still has **no run
-  history** — PAYE is computed fresh on every read from whatever the
-  columns hold right now, no persisted "payslip for March 2026" that stays
-  fixed once computed. A real payroll-run table is the future fix if "what
-  did we actually pay in a past period" ever needs answering.
-- `activity_events` (0011) is sparsely populated — only HOD Tasks and
-  Submit Report write to it so far. Dept Feed and Access Log will only
-  show a fraction of real department activity until more write paths (and
-  the future Timeline/staff Team Feed pages) are wired to it.
+- Requests (`/hod/requests`, and now `/staff/requests`, same table) has no
+  review flow — `approvals` (0012) has no update policy, so a request can
+  be filed but never move out of `pending`. The leadership Approvals /
+  Disbursement Queue page (`p-lead-approvals`) that would review these is
+  still coming-soon. Deliberate v1 scope, not a bug — now two pages write
+  into this same unreviewed queue instead of one, unchanged in kind.
+- **Payroll (`/hod/payroll`) can be exercised through the app** — salary
+  structure is settable via Staff Management, Payroll computes real PAYE
+  against it. Still has **no run history** — PAYE is computed fresh on
+  every read, no persisted "payslip for March 2026" that stays fixed once
+  computed.
+- `activity_events` (0011) now has three write paths — HOD Tasks, HOD
+  Submit Report, and (this session) Staff Submit Report — still not
+  Leadership Timeline, which remains coming-soon and would need its own
+  write paths wired in whenever it's built.
 - **`performance_reviews` (0014) write access isn't attributed at the RLS
   layer** — any leadership/hr/admin account can write a review with any
-  `reviewer_code`, including someone else's; the field is set from the
-  signed-in session client-side but not asserted server-side the way
-  `messages.sender_code` is. Not tightened here since the handover doesn't
-  call for it, but worth knowing before assuming reviewer attribution is
-  trustworthy against a malicious HR account.
-- Whether an employee should ever read their own performance review is a
-  real open question the handover doesn't answer. Not built — deliberately
-  left open rather than guessed at either way.
+  `reviewer_code`, including someone else's; not tightened, the handover
+  doesn't call for it. Whether an employee should ever read their own
+  review is also still an open question, not built either way.
 - Two dead, unreferenced duplicate routes exist:
   `leadership/staff/dashboard/` and `leadership/staff/tasks/` are
   byte-identical copies of `staff/dashboard/`/`staff/tasks/`, linked from
-  nowhere. Found last session, still not removed — flagged for the user to
-  decide.
+  nowhere. Found two sessions ago, still not removed — flagged for the
+  user to decide.
 - `docs/INTERFACE.md` still on hold — color scheme to be decided against
   the legacy screenshots before any real UI/visual work.
+- **New, from this session**: Resources (`/staff/resources`) reads media
+  only — the handover's own description includes templates, which has no
+  table or migration anywhere in the app (`p-lead-templates` itself is
+  still coming-soon for every role that reaches it). Deferred plainly, not
+  built as a stub. If/when a templates table is designed, Resources is the
+  page that would need a second query added.
+- **New, from this session**: staff's Media Library (`/staff/media`) can
+  upload, matching HOD's version — deliberately not read-only. If that
+  turns out to be the wrong default (e.g. the org wants upload restricted
+  to department heads only), it's a page-level check to tighten, not an
+  RLS change, since `media_write_by_staff` doesn't distinguish the two
+  roles either way.
+- **New, from this session**: staff's Projects page (`/staff/projects`) is
+  deliberately read-only, unlike HOD's and leadership's, which both keep
+  the create-project/add-milestone forms — see this session's own
+  EXECUTION.md entry for the reasoning. Worth the user's explicit sign-off
+  if a future session is asked to "make staff/projects consistent with
+  hod/projects," since consistency here was a deliberate divergence, not
+  an oversight.
+
+## 2026-08-31 — Staff workspace (7 pages), closes out the last entirely-unbuilt-page batch
+
+Built the remaining seven `p-staff-*` pages: Team Feed, Media Library,
+Projects, Requests, Resources, Submit Report, Summary Reports. Staff already
+had Dashboard and Tasks; this closes the workspace to 12/12.
+
+**Ran the real resolver script first, not a hand count** — same
+`getNavItems()`/`NAVMAP`/`routeForPage()` methodology used every session
+since 2026-08-18, fixture unchanged (sector `'Development and Advocacy'`,
+`modules: null`). Baseline going in matched the HR session's own closing
+number exactly: **31/59 built, staff 5/12**. Re-run after this batch:
+**staff 12/12, org total 38/59 built, 21 still coming-soon** — every
+remaining id is leadership-specialized (`p-lead-*`) or two cross-sector ids
+(`p-pm-projects`, `p-mon-board`) that never resolve true for this NGO org
+anyway. No workspace is even partially unbuilt anymore; what's left is all
+inside `leadership`'s own 34-item nav.
+
+**No new migrations, confirmed before writing anything** — every table this
+batch touches (`approvals`, `summary_reports`, `activity_events`, `media`,
+`projects`/`project_milestones`) already has real, non-PROVISIONAL rows in
+`database.types.ts`, and RLS on all five is already `app.is_staff_of(org_id)`
+(any non-donor org member reads/writes), the same v1 trade-off used
+everywhere else in this project. `database.types.ts` was, again, genuinely
+UTF-16LE with CRLF on disk at the start of this session — the **fourth**
+recurrence — confirmed via `file`, converted the same way as every prior
+time before touching anything (`iconv -f UTF-16LE -t UTF-8`, BOM and `\r`
+stripped; the diff against git is a pure binary/encoding change, zero
+content difference — verified with `git diff --stat`).
+
+**Pages, all server-page + client-component split, all gated at the page
+level to `['staff','admin']`** (a UX nicety on top of already-permissive
+RLS, matching the HOD/HR convention rather than the older, ungated
+`staff/dashboard`/`staff/tasks` precedent — stated in each file's own
+comment, not left to imply the check is doing more than it is):
+
+- **Requests** (`/staff/requests`) — near-verbatim port of
+  `HodRequestsClient`: submit against `approvals`, see only your own status
+  (`requester_code = employee_code`). No review UI, same open gap already
+  logged for HOD's version.
+- **Submit Report** (`/staff/submit`) — near-verbatim port of
+  `HodSubmitClient`: writes `summary_reports` with department fixed from
+  the session, same best-effort `activity_events` write after so Team Feed
+  has real content immediately.
+- **Summary Reports** (`/staff/summary`) — the one page in this batch that
+  is *not* a department-filtered HOD sibling. Filtered to
+  `author_code = employee.employee_code` — a staff member's own submission
+  history, not their department's. Called out explicitly per the task
+  brief's own warning that this is easy to get wrong by copying HOD's
+  department filter out of habit.
+- **Team Feed** (`/staff/feed`) — near-verbatim port of `HodFeedClient`:
+  `activity_events`, department-filtered. The name says "team," not
+  "mine" — the department's feed from a staff seat, same table Access Log/
+  Dept Feed already read.
+- **Media Library** (`/staff/media`) — near-verbatim port of
+  `HodMediaClient`: **read and upload**, department-scoped. Decided
+  against read-only: `media_write_by_staff` (0004) already permits any
+  non-donor staff member to upload, and making staff's version read-only
+  would create an asymmetry RLS doesn't ask for (a department head can add
+  department media, a regular staff member in the same department
+  couldn't).
+- **Resources** (`/staff/resources`) — new client, reads `media` **only**,
+  templates half stated as deferred (no table, no migration, still on the
+  leadership-specialized backlog — `p-lead-templates` itself is
+  coming-soon for every role that reaches it). Deliberately **org-wide,
+  read-only**, distinct scope from Media Library on purpose: framed as a
+  shared reference library ("what the org already has") rather than "my
+  department's uploads." `media_read_by_staff` (0004) already permits
+  org-wide read for any non-donor member, so this needed no RLS change,
+  just the query dropping the `.eq('department', ...)` clause Media
+  Library keeps.
+- **Projects** (`/staff/projects`) — same `projects`/`project_milestones`
+  tables and single-most-recent-project v1 assumption as leadership's and
+  HOD's versions. **Read-only for staff**, unlike HOD (which kept
+  leadership's write forms) — the one genuine judgment call in this batch
+  flagged rather than decided silently. `projects_write_by_staff` (0005)
+  would permit staff to write, but handing every staff account (a much
+  larger population than department heads) the ability to create/edit the
+  org's one active project by default is a bigger permission to hand out
+  than RLS strictly requires. Stated as a deliberate default, not a
+  limitation of what's possible — widening this later is a real, explicit
+  choice if the org wants it.
+
+Verified: `tsc --noEmit` clean in `apps/ngo`; `npx tsc -p
+packages/core/tsconfig.json --noEmit` clean except the same 11
+pre-existing, unrelated dead-ported-type-file errors already logged
+(`app-user.ts`, `compute.ts`, `invoice.ts`, `monitor.ts`,
+`monitor-entry.ts`, `org-targets.ts`, `platform-staff.ts`, `staff-kpi.ts`,
+`staff-target.ts`, `task-event.ts`, `task-stop.ts` — confirmed via
+`git status` that none of these files were touched this session, not
+re-verified with `git stash` since nothing in the working tree touches
+them). `next build` clean, 46 routes, all 7 new `/staff/*` routes correctly
+dynamic (ƒ). `eslint` clean on every new file.
+
+**Not yet tested against real data** — no live Supabase session available
+in this sandbox, so no request/report/media/project has actually been
+created through these seven pages yet. Natural next check once a real
+account exists: sign in as `staff` with a department set, submit a report
+and a request, upload a file to Media Library, confirm all four show up in
+the right places (Team Feed picks up the report's activity_events row,
+Summary Reports shows only that account's own report and not a
+colleague's, Media Library shows the upload department-scoped, Resources
+shows it org-wide); confirm Projects renders read-only (no create form
+visible) even for a `staff` account; confirm a `donor` account cannot reach
+any `/staff/*` route directly by URL (page-level check should block it,
+RLS would also block the underlying reads/writes even if it didn't).

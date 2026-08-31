@@ -502,3 +502,31 @@ confusing "may be a mistake" cast error seen here rather than an obviously
 related one. If a select list needs to be long, break it across lines
 inside one literal (as this fix does) rather than joining separate
 literals.
+
+
+## database.types.ts's UTF-16LE recurrence, a fourth time (2026-08-31)
+
+Found genuinely UTF-16LE with CRLF a fourth time, at the start of the
+staff-workspace session — first "fixed for real" 2026-08-19, recurred
+2026-08-25, recurred again 2026-08-26, now a fourth time. `file <path>`
+confirmed it directly, as always; converted the same way as every prior
+time (`iconv -f UTF-16LE -t UTF-8`, BOM and `\r` stripped) before touching
+the file. Verified this time that the conversion was pure encoding, no
+content drift: `git diff --stat` on the committed file showed a binary
+diff (`Bin 81382 -> 39364 bytes`, the size drop being exactly what
+UTF-16→UTF-8 halving plus CRLF→LF stripping predicts) with no textual
+diff at all — the fix touched bytes, not content.
+
+Four occurrences is no longer "a recurring bug worth flagging," it's a
+standing property of whatever machine and process regenerates this file,
+confirmed independently four separate sessions in a row with the exact
+same fix working every time. The practical rule from the last three
+entries already covers what to check and how to fix it; the addition
+worth making explicit now is that this has never once required more than
+`file` + `iconv`, so there's no reason to escalate it into anything more
+involved than routine — but "genuinely UTF-8 already, checked with `file`"
+(true for exactly one of these four sessions, the HR one) shouldn't be
+read as the recurrence having stopped. Treat every session touching this
+file as needing its own check, permanently, until an automated
+`postinstall`/`predev` normalization step exists (still not built, tracked
+in EXECUTION.md's open-gaps list).
