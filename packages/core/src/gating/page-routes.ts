@@ -1,6 +1,13 @@
 const PAGE_ROUTES: Record<string, string> = {
   'p-staff-dashboard': '/staff/dashboard',
   'p-staff-tasks': '/staff/tasks',
+  'p-staff-requests': '/staff/requests',
+  'p-staff-submit': '/staff/submit',
+  'p-staff-summary': '/staff/summary',
+  'p-staff-feed': '/staff/feed',
+  'p-staff-media': '/staff/media',
+  'p-staff-resources': '/staff/resources',
+  'p-staff-projects': '/staff/projects',
   'p-lead-overview': '/leadership/dashboard',
   'p-lead-tasks': '/leadership/tasks',
   'p-lead-projects': '/leadership/projects',
