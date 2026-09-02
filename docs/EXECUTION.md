@@ -1251,106 +1251,6 @@ NGO-relevant pages remain coming-soon, all leadership-specialized or
 platform-admin at this point — no other entirely-unbuilt workspace is
 left.
 
-## Open at end of this session (2026-08-31, staff workspace)
-
-**Convention reminder, carried forward from the HR session's own note**:
-this section is rewritten, not re-dated, every time it's touched — every
-number below comes from a fresh run of the resolver script this session,
-not inherited from the entry above it.
-
-**Authoritative source for "what pages are missing"**: not this list — run
-the real gating resolver against every role and cross-reference
-`page-routes.ts` (script not committed anywhere in the repo; rewrite it
-from `getNavItems()`/`NAVMAP`/`routeForPage()` and the NGO fixture
-described in the 2026-08-18 entry, same as every session since has done).
-As of this session, freshly re-run after the staff workspace: **38 of 59
-unique NGO pages built, 21 still `/coming-soon`**. Staff, HOD, HR are all
-now fully built — **no workspace is even partially unbuilt anymore**.
-Every remaining coming-soon id is inside `leadership`'s own nav
-(`p-lead-*`, 19 distinct ids reachable there plus `p-lead-approvals`/
-`p-lead-income`/`p-lead-invoices`/`p-lead-spend`/`p-lead-analytics`/
-`p-lead-payroll` also reachable by `finance`, `p-lead-access`/
-`p-lead-delivery` also by `hr`) or two cross-sector ids that never resolve
-true for this NGO org at all (`p-pm-projects`, `p-mon-board` — dead ends
-for gating reasons, not a building backlog).
-
-**Genuinely still open, checked against the real current state, not
-copied from an old list**:
-
-- Task/project write access is org-wide for any non-donor staff member —
-  the handover's real rule (leadership org-wide, HOD within department,
-  staff only their own) needs per-row filtering, not implemented. The
-  HOD and staff workspaces' department/self-scoped pages filter what they
-  *show* at the query level; the underlying RLS policies still permit any
-  non-donor staff member to write any row — a page filter, not an RLS
-  boundary. Staff's own Projects page (this session) sidesteps the write
-  half of this specifically by being read-only, but the read-side gap
-  (org-wide visibility where the handover implies scoping) is unchanged.
-- Milestone verification isn't reviewer-gated at the RLS layer —
-  `app.is_reviewer()` exists (0003) and is unused on `project_milestones`.
-- Single-project assumption on the project-related pages (leadership, hod,
-  and now staff) — querying "most recent project" rather than supporting
-  multiple.
-- Task submission (`staff/tasks/[id]`) is still local-only React state,
-  not a real write.
-- No UI for editing/deleting an appointment or a fund line once created;
-  same for most other create-only forms built this project — add-only,
-  no edit/delete, throughout.
-- `database.types.ts` regenerated as UTF-16LE with CRLF a **fourth** time,
-  found and converted at the start of this session (see LEARNINGS.md) —
-  still no automated guard. Worth a `postinstall`/`predev` normalization
-  script at this point rather than continuing to catch it by hand every
-  session; four recurrences is a pattern, not bad luck.
-- Messages has no read-receipt, edit, or unsend — immutable by design for
-  v1, not a bug, but worth knowing before assuming it's a full messaging
-  feature.
-- Requests (`/hod/requests`, and now `/staff/requests`, same table) has no
-  review flow — `approvals` (0012) has no update policy, so a request can
-  be filed but never move out of `pending`. The leadership Approvals /
-  Disbursement Queue page (`p-lead-approvals`) that would review these is
-  still coming-soon. Deliberate v1 scope, not a bug — now two pages write
-  into this same unreviewed queue instead of one, unchanged in kind.
-- **Payroll (`/hod/payroll`) can be exercised through the app** — salary
-  structure is settable via Staff Management, Payroll computes real PAYE
-  against it. Still has **no run history** — PAYE is computed fresh on
-  every read, no persisted "payslip for March 2026" that stays fixed once
-  computed.
-- `activity_events` (0011) now has three write paths — HOD Tasks, HOD
-  Submit Report, and (this session) Staff Submit Report — still not
-  Leadership Timeline, which remains coming-soon and would need its own
-  write paths wired in whenever it's built.
-- **`performance_reviews` (0014) write access isn't attributed at the RLS
-  layer** — any leadership/hr/admin account can write a review with any
-  `reviewer_code`, including someone else's; not tightened, the handover
-  doesn't call for it. Whether an employee should ever read their own
-  review is also still an open question, not built either way.
-- Two dead, unreferenced duplicate routes exist:
-  `leadership/staff/dashboard/` and `leadership/staff/tasks/` are
-  byte-identical copies of `staff/dashboard/`/`staff/tasks/`, linked from
-  nowhere. Found two sessions ago, still not removed — flagged for the
-  user to decide.
-- `docs/INTERFACE.md` still on hold — color scheme to be decided against
-  the legacy screenshots before any real UI/visual work.
-- **New, from this session**: Resources (`/staff/resources`) reads media
-  only — the handover's own description includes templates, which has no
-  table or migration anywhere in the app (`p-lead-templates` itself is
-  still coming-soon for every role that reaches it). Deferred plainly, not
-  built as a stub. If/when a templates table is designed, Resources is the
-  page that would need a second query added.
-- **New, from this session**: staff's Media Library (`/staff/media`) can
-  upload, matching HOD's version — deliberately not read-only. If that
-  turns out to be the wrong default (e.g. the org wants upload restricted
-  to department heads only), it's a page-level check to tighten, not an
-  RLS change, since `media_write_by_staff` doesn't distinguish the two
-  roles either way.
-- **New, from this session**: staff's Projects page (`/staff/projects`) is
-  deliberately read-only, unlike HOD's and leadership's, which both keep
-  the create-project/add-milestone forms — see this session's own
-  EXECUTION.md entry for the reasoning. Worth the user's explicit sign-off
-  if a future session is asked to "make staff/projects consistent with
-  hod/projects," since consistency here was a deliberate divergence, not
-  an oversight.
-
 ## 2026-08-31 — Staff workspace (7 pages), closes out the last entirely-unbuilt-page batch
 
 Built the remaining seven `p-staff-*` pages: Team Feed, Media Library,
@@ -1456,3 +1356,290 @@ shows it org-wide); confirm Projects renders read-only (no create form
 visible) even for a `staff` account; confirm a `donor` account cannot reach
 any `/staff/*` route directly by URL (page-level check should block it,
 RLS would also block the underlying reads/writes even if it didn't).
+
+## 2026-09-02 — Correction: p-mon-board and p-pm-projects were never dead ends
+
+Before building anything this session, the task brief flagged that two
+EXECUTION.md entries disagree with each other about `p-mon-board` and
+`p-pm-projects`: the 2026-08-19 "Backlog reckoning" entry treated the full
+coming-soon count as reachable-but-unbuilt for leadership; this session's
+own two 2026-08-31 entries (the dated entry and its "Open at end of
+session" summary, both now above/removed respectively — see below)
+asserted both ids "never resolve true for this NGO org ... dead ends for
+gating reasons, excluded from the denominator entirely."
+
+**Checked mechanically rather than picking one, per the task's own
+instruction**: ran `getNavItems('leadership', org, emp)` directly against
+the unchanged NGO fixture and inspected the real output. Both ids **are**
+present. Traced why: neither `p-mon-board` nor `p-pm-projects` has an
+entry in `FEATURE_NAV` at all, and `navItemAllowed()` returns `true`
+unconditionally when a page id has no `FEATURE_NAV` entry (`if (!mod)
+return true;`) — there is no module gate on either id, full stop. They are
+genuinely reachable, coming-soon leadership pages, not dead ends.
+
+**The 2026-08-31 claim was wrong.** Per docs/LEARNINGS.md's own
+append-only-correction convention (never silently edit a wrong claim away,
+say plainly it was wrong), this is that correction. The original
+2026-08-31 dated entry further up this file is left untouched, as
+EXECUTION.md's own append-only rule requires — this entry is the
+correction, not a rewrite of that one. The "Open at end of session"
+section that also carried the wrong claim was, by contrast, always the
+mutable, rewritten-every-time-it's-touched status snapshot its own text
+said it was — it has been replaced outright by the fresh version at the
+end of this file, which does not repeat the error. CLAUDE.md's "Known open
+gaps" section (same kind of mutable summary, not a log) is corrected
+below, in this session's own update to it.
+
+**Practical consequence**: the resolver's real denominator has always
+been the full 59-id count including these two — nothing about counts
+reported in earlier sessions (29/59, 31/59, 38/59, all before this
+correction) was actually wrong, since none of those counts excluded
+`p-mon-board`/`p-pm-projects` from the coming-soon side either; only this
+session's own prose characterization of *why* they were coming-soon was
+wrong, not any arithmetic. Confirmed by re-deriving the leadership
+coming-soon list fresh this session (below) and finding both ids present
+in it, consistent with every prior session's raw count.
+
+## 2026-09-02 — Approvals (review UI) and the Money pages (5 pages)
+
+Built the five remaining money-related pages: Approvals / Disbursement
+Queue, Income, Spend vs Income, Invoices, and leadership's own Payroll.
+Closes `p-lead-approvals`, `p-lead-income`, `p-lead-invoices`,
+`p-lead-spend`, `p-lead-payroll`.
+
+**Ran the real resolver script first, not a hand count** — same
+methodology as every session since 2026-08-18, same unchanged NGO fixture.
+Baseline going in matched the staff-workspace session's real closing
+number: **38/59 built**. Re-run after this batch: **43/59 built, 16 still
+coming-soon** — every remaining id is inside `leadership`'s own nav or the
+two cross-sector ids addressed in the correction entry above.
+
+**Two new migrations, both genuinely needed, checked first rather than
+assumed**:
+
+- **`0015_approvals_review.sql`** — `0012` shipped deliberately with no
+  UPDATE policy ("nothing can move a request out of 'pending' yet ... a
+  real, stated gap, not an oversight"). Adds one UPDATE policy restricted
+  to `leadership/finance/admin`, matching the role set that already
+  governs income/expenses/funders. Same limitation already accepted for
+  `project_milestones_write_by_staff` (0005) stated again here: a plain
+  role-based UPDATE policy can't distinguish "approve/reject this" from
+  "edit any other column" — not solved with a trigger, stated plainly.
+  `reviewed_by` stores the reviewer's full name (not a code) — `approvals`
+  has no paired `reviewed_by_name` column, so `expenses.created_by`
+  (already a name, not a code, per 0005) is the closer precedent than
+  `requester_code`/`requester_name`.
+- **`0016_invoices.sql`** — the one genuinely new table this batch.
+  Matched `packages/core/src/types/invoice.ts`'s pre-existing expected
+  shape (`items` as JSON-encoded text, same trap already recorded for
+  `req_items`/`deliverables_json`) rather than redesigning it, same
+  continuity `0012`/`0014` each called out explicitly when they did this.
+
+**Real discovery mid-build, not assumed going in — same category as
+`kpi/sessions.ts` in the HOD session (2026-08-26)**: verifying
+`invoice.ts`'s type against `packages/core`'s own tsconfig surfaced
+`packages/core/src/finance/invoice-matching.ts`, ported wholesale in the
+original monorepo restructure (2026-08-18) and sitting completely unused
+until now, already calling `invoice.amount` in `isInvoiceSettled()`. The
+table was going to be named with a `total` column (matching the
+handover's own wording, "VAT computed into the total") until this was
+found — renamed to `amount` instead, to match the pre-existing dormant
+consumer rather than leaving it permanently broken, same resolution
+already used once for `activity_events`' `actor_code`/`actor_name` →
+`user_code`/`user_name`. Grepped for every other importer of
+`types/invoice` first (only the one file) before deciding this was safe to
+do without missing another expectation elsewhere. See docs/LEARNINGS.md.
+
+**Scope, decided and stated rather than built halfway silently**: VAT at
+7.5% (the handover's own figure) is computed from line items and stored at
+creation time — deterministic math, no reason to defer. Marking an invoice
+paid is real, not a stub: it sets `status='paid'` + `paid_at` AND inserts
+a matching `income` row (`invoice_id`/`invoice_no` linked, `amount` =
+invoice total) — the actual "marking an invoice paid records income"
+behavior the handover describes. This is also the first real use of
+`income.invoice_id`/`income.invoice_no` (0005), present since the very
+first operations-tables migration and unused by any page until now.
+**Deferred, stated plainly**: editing an invoice's line items after
+creation (add-only, same pattern as fund lines/appointments), PDF export
+or emailing an invoice, multi-currency.
+
+**Pages, all gated `['leadership','finance','admin']`** — checked against
+the resolver output above, this is exactly who reaches each id, and
+matches income/expenses/funders' existing RLS role set:
+
+- **Approvals** (`/leadership/approvals`) — the real functional
+  gap-closer, not just another read-only page. Org-wide (matches
+  `approvals_read_by_staff`'s own org-wide read), two sections: Pending
+  (approve/reject) and Reviewed (history). Single route serves both
+  `p-lead-approvals` labels ("Approvals" for leadership, "Disbursement
+  Queue" for finance) — same pattern as every other page in this app
+  reachable by more than one role through one id.
+  **Verified, not assumed, that HOD's and staff's existing Requests pages
+  need zero changes**: both `HodRequestsClient`/`StaffRequestsClient` and
+  their server pages already query `approvals` with `select('*')` and no
+  status filter, and both already render `Badge variant={STATUS_VARIANT[
+  r.status] ?? 'muted'}`. An approval/rejection made here is picked up
+  correctly by both existing pages on their next server render — confirmed
+  by reading their actual query code, not assumed from the schema. One
+  precision worth stating: this is a fresh server-render picking up the
+  new row, not a live push — a tab already open on `/hod/requests` won't
+  update until it navigates or reloads. Not a gap to fix (no page in this
+  project has live updates), just not "immediately," worth being exact
+  about.
+- **Income** (`/leadership/income`) — checked `/leadership/budget` first:
+  it already reads and summarizes `income` with a write form. Deliberately
+  **not** a second write form over the same table (two divergent paths to
+  write the same rows is exactly the kind of drift this project has hit
+  before with `database.types.ts`, at a different layer). Instead a fuller
+  read: every column Budget & Spend's list doesn't show (`payer_type`,
+  `payer_contact`, the `invoice_no`/`invoice_id` link into the new
+  Invoices page, `receipt_no`, `project_ref`), plus a by-payer-type
+  breakdown. Points back to Budget & Spend for adding entries.
+- **Spend vs Income** (`/leadership/spend`) — read-only per the handover's
+  own description, over the same `income`/`expenses` Budget & Spend
+  already reads. Income-by-source and expenses-by-category breakdowns with
+  share-of-total, not a chart — no charting library exists in this
+  project and `docs/INTERFACE.md` is still on hold.
+- **Invoices** (`/leadership/invoices`) — create (line items parsed from
+  `description | qty | rate` lines → auto-computed `subtotal`/
+  `vat_amount`/`amount`), list, mark sent/paid. Marking paid also writes
+  the linked `income` row (best-effort in the sense that the invoice
+  status write is primary and already succeeded; a failed income insert is
+  surfaced to the user rather than silently swallowed, not treated as
+  fully best-effort the way the activity_events writes elsewhere in this
+  project are).
+- **Payroll — leadership** (`/leadership/payroll`) — checked `/hod/payroll`
+  first: same six salary columns (0013), same ported `computePAYE()`, same
+  "no run history" v1 trade-off. This version is **org-wide** (drops HOD's
+  department filter and requirement) and adds a Department column plus an
+  org-wide total-net-payroll stat tile HOD's single-department view didn't
+  need. **Deliberately read-only, but for a different reason than HOD's
+  version**: HOD is read-only because `employees_manage_by_hr` (0003)
+  excludes `hod` from writing `employees` — a real RLS boundary. Leadership
+  is *not* excluded — RLS alone doesn't require this page to be read-only.
+  Kept read-only anyway because Staff Management (2026-08-26 session)
+  already owns editing salary structure org-wide for
+  leadership/hr/admin — a second edit form here would recreate the exact
+  "two paths write the same row" problem this project avoids elsewhere.
+  Stated explicitly rather than silently copying HOD's read-only precedent
+  without reconsidering whether the same reasoning actually applied.
+
+No Supabase credentials in this session (`npx supabase projects list`
+fails with `LegacyPlatformAuthRequiredError`, same as every session so
+far) — both migrations are written and reviewed but not run. A
+PROVISIONAL stub was added for `invoices` only (`0015` adds no new
+columns, purely an RLS policy — invisible to generated types, no stub
+needed), built by comparing against `income`'s real shape, clearly
+labeled. **Action for the user**: run `0015_approvals_review.sql` then
+`0016_invoices.sql` in that order, then regenerate `database.types.ts` for
+real and send it over — the `invoices` stub gets replaced wholesale, not
+merged alongside.
+
+`database.types.ts` was already genuinely UTF-8 at the start of this
+session (checked with `file` before touching it) — did not recur a fifth
+time this pass.
+
+Verified: `tsc --noEmit` clean in `apps/ngo`; `npx tsc -p
+packages/core/tsconfig.json --noEmit` clean except the same 11
+pre-existing, unrelated dead-ported-type-file errors already logged
+(confirmed via `git status` that none of those 11 files are touched this
+session) — notably `invoice.ts` and `invoice-matching.ts` are now clean,
+dropping off that list for the first time since it was first logged.
+`next build` clean, 51 routes, all 5 new `/leadership/*` routes correctly
+dynamic (ƒ). `eslint` clean on every new file.
+
+**Not yet tested against real data** — no live Supabase session available
+in this sandbox, so no approval decision, invoice, or anything else has
+actually been made/created through these five pages yet. Natural next
+check once the migrations are run: file a request through `/hod/requests`
+or `/staff/requests`, approve it on `/leadership/approvals`, reload the
+originating page and confirm the badge changed; create an invoice, mark it
+paid, confirm a matching row appears on `/leadership/income` and the
+Budget & Spend totals include it; confirm a `staff`/`hod`/`hr` account
+cannot reach any of the five new routes directly by URL.
+
+## Open at end of this session (2026-09-02, Approvals + Money pages)
+
+**Convention note**: this section is rewritten in full every time it's
+touched, relocated here to the true end of the file (it had drifted to sit
+above the dated entry describing the same session's work in the prior
+version of this file — a structural slip, fixed here, not left for the
+next session to trip over). Every number below comes from this session's
+own fresh resolver run, not inherited.
+
+**Authoritative source for "what pages are missing"**: not this list — run
+the real gating resolver against every role and cross-reference
+`page-routes.ts` (script not committed anywhere in the repo; rewrite it
+from `getNavItems()`/`NAVMAP`/`routeForPage()` and the NGO fixture
+described in the 2026-08-18 entry). As of this session: **43 of 59 unique
+NGO pages built, 16 still `/coming-soon`**. All coming-soon ids are now
+inside `leadership`'s own nav — `p-lead-access`, `p-lead-analytics`,
+`p-lead-command`, `p-lead-customize`, `p-lead-delivery`,
+`p-lead-formbuilder`, `p-lead-regional`, `p-lead-reports`,
+`p-lead-settings`, `p-lead-story`, `p-lead-summaries`, `p-lead-templates`,
+`p-lead-targets`, `p-lead-timeline`, plus `p-mon-board` and
+`p-pm-projects` (genuinely reachable, not dead ends — see the correction
+entry above). Staff, HOD, and HR remain fully built; finance has only
+`p-lead-analytics` left; hr has `p-lead-delivery`/`p-lead-access`.
+
+**Genuinely still open, checked against the real current state, not
+copied from an old list**:
+
+- Task/project write access is org-wide for any non-donor staff member —
+  the handover's real rule (leadership org-wide, HOD within department,
+  staff only their own) needs per-row filtering, not implemented. Unchanged
+  this session.
+- Milestone verification isn't reviewer-gated at the RLS layer —
+  `app.is_reviewer()` exists (0003) and is unused on `project_milestones`.
+- Single-project assumption on the project-related pages — querying "most
+  recent project" rather than supporting multiple. Unchanged.
+- Task submission (`staff/tasks/[id]`) is still local-only React state,
+  not a real write.
+- No UI for editing/deleting an appointment, a fund line, or (new this
+  session) an invoice once created — add-only throughout this project, not
+  just this batch.
+- `database.types.ts` regenerated as UTF-16LE with CRLF four separate
+  times so far (see LEARNINGS.md) — genuinely UTF-8 already at the start
+  of this session, did not recur a fifth time, but still no automated
+  guard. Worth a `postinstall`/`predev` normalization script at this
+  point.
+- Messages has no read-receipt, edit, or unsend — immutable by design,
+  not a bug.
+- **Requests now has a real review flow** (`/leadership/approvals`, this
+  session) — the "no review policy" gap logged since 0012 is genuinely
+  closed: `0015` added the UPDATE policy, HOD's and staff's Requests pages
+  confirmed to reflect a decision on next render with zero changes on
+  their end.
+- **Payroll (`/hod/payroll` and, this session, `/leadership/payroll`) can
+  be exercised through the app.** Neither has **run history** — PAYE is
+  computed fresh on every read, no persisted "payslip for March 2026."
+- `activity_events` (0011) still has only three write paths (HOD Tasks,
+  HOD Submit Report, staff Submit Report) — not Leadership Timeline, still
+  coming-soon.
+- `performance_reviews` (0014) write access isn't attributed at the RLS
+  layer — unchanged, not this batch's table.
+- Two dead, unreferenced duplicate routes exist:
+  `leadership/staff/dashboard/` and `leadership/staff/tasks/` — still not
+  removed, still flagged for the user to decide.
+- `docs/INTERFACE.md` still on hold.
+- Resources (`/staff/resources`) reads media only — templates half still
+  deferred, no table.
+- **New, from this session**: Invoices (`/leadership/invoices`) is
+  add-only and has no edit form for line items after creation — a
+  deliberate v1 scope decision (see this session's own entry), matching
+  the pattern already used for fund lines and appointments, not an
+  oversight.
+- **New, from this session**: marking an invoice paid inserts an `income`
+  row but does not (and structurally cannot, without a schema change)
+  prevent marking the *same* invoice paid twice, which would insert a
+  second income row for the same invoice. Not guarded against — a real,
+  found-but-not-closed gap, worth a unique constraint or a client-side
+  status check tightened later if this becomes a real workflow rather than
+  a v1 exercise of the table.
+- **New, from this session**: `approvals_update_by_finance` (0015) is a
+  plain role check, same limitation already accepted for
+  `project_milestones_write_by_staff` — it can't distinguish "approve/
+  reject" from "edit any other column on the row" at the RLS layer. Not
+  currently exploitable through this project's own UI (the Approvals page
+  only ever sends `{status, reviewed_by, reviewed_at}`), but a real gap if
+  any other client ever writes through this policy.

@@ -616,6 +616,78 @@ export type Database = {
           },
         ]
       }
+      // PROVISIONAL — hand-added, matching 0016_invoices.sql, until the
+      // migration is run against the live project and this file is
+      // regenerated for real (`supabase gen types typescript --linked`).
+      // Built by comparing against `income`'s real shape (structurally
+      // closest existing table). Replace wholesale when the real
+      // regeneration comes back — do not merge alongside it. See
+      // docs/EXECUTION.md.
+      invoices: {
+        Row: {
+          amount: number
+          client_name: string | null
+          created_at: string
+          created_by: string | null
+          due_date: string | null
+          id: string
+          invoice_no: string
+          issue_date: string | null
+          items: string | null
+          note: string | null
+          org_id: string
+          paid_at: string | null
+          status: string
+          subtotal: number
+          updated_at: string
+          vat_amount: number
+        }
+        Insert: {
+          amount?: number
+          client_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_no: string
+          issue_date?: string | null
+          items?: string | null
+          note?: string | null
+          org_id: string
+          paid_at?: string | null
+          status?: string
+          subtotal?: number
+          updated_at?: string
+          vat_amount?: number
+        }
+        Update: {
+          amount?: number
+          client_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_no?: string
+          issue_date?: string | null
+          items?: string | null
+          note?: string | null
+          org_id?: string
+          paid_at?: string | null
+          status?: string
+          subtotal?: number
+          updated_at?: string
+          vat_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       media: {
         Row: {
           activity_id: number | null

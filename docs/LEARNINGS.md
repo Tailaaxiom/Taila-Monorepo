@@ -530,3 +530,38 @@ read as the recurrence having stopped. Treat every session touching this
 file as needing its own check, permanently, until an automated
 `postinstall`/`predev` normalization step exists (still not built, tracked
 in EXECUTION.md's open-gaps list).
+
+
+## Another pre-existing dormant file in packages/core expected a table before it existed — invoice-matching.ts
+
+Same category as `kpi/sessions.ts` in the HOD session (2026-08-26), found
+the same way: building `0016_invoices.sql` and giving `invoices` a real
+table, `packages/core`'s own standalone tsconfig (not `apps/ngo`'s, which
+never reaches a file nothing imports) surfaced
+`packages/core/src/finance/invoice-matching.ts` — ported wholesale in the
+original monorepo restructure (2026-08-18), sitting completely unused
+until this session, already calling `invoice.amount` inside
+`isInvoiceSettled(invoice: Invoice, paidAmount: number)`.
+
+The column was about to be named `total` (the handover's own word: "VAT
+computed into the total"). Grepped for every importer of
+`types/invoice` first — exactly one, `invoice-matching.ts` — then renamed
+the column to `amount` to match it, rather than either leaving the dormant
+file permanently broken or blindly trusting the handover's wording over a
+real, already-committed consumer.
+
+**The general lesson, now confirmed a second time, not a one-off**: adding
+a real table for a page id that has a pre-ported `packages/core/src/types/
+*.ts` file waiting on it (this project has several — `approval.ts` and
+`performance-review.ts` before their tables existed, now `invoice.ts`) is
+not just a matter of matching that type file's own expected shape.
+Anything else in `packages/core` that already imports from that type file
+is a second source of truth for what the schema needs to look like, and it
+won't surface in `apps/ngo`'s own `tsc --noEmit` at all — only
+`packages/core`'s standalone tsconfig reaches it. **Practical rule,
+sharpened from the kpi/sessions.ts entry**: before finalizing a new
+table's column names against a dormant type file, grep
+`packages/core/src` for every other importer of that same type file, not
+just the type file itself — a naming choice that looks free (the handover
+said "total," nothing said otherwise) can already be constrained by code
+nobody mentioned, exactly like it was here.

@@ -29,7 +29,7 @@ apps/ngo/src/
   lib/auth/       identity.ts, setup-tokens.ts, RealCurrentUserProvider.tsx
   lib/fixtures/   NGO-specific sample/test data — NOT in packages/core, see below
 
-supabase/migrations/   0001-0014 so far, run in order, SQL Editor, one at a time
+supabase/migrations/   0001-0016 so far, run in order, SQL Editor, one at a time
 docs/                  EXECUTION.md, LEARNINGS.md, INTERFACE.md
 ```
 
@@ -154,48 +154,40 @@ cross-reference `page-routes.ts`. See EXECUTION.md's "Backlog reckoning"
 (2026-08-19) entry for the exact script. Re-run it rather than trusting
 any prose list, including this file's, before treating a count as current.
 
-## Known open gaps, current as of 2026-08-31, staff workspace session (see EXECUTION.md for detail)
+## Known open gaps, current as of 2026-09-02, Approvals + Money pages session (see EXECUTION.md for detail)
 
 - Task/project write access is org-wide for any non-donor staff member —
   the handover's real rule (leadership org-wide, HOD within department,
-  staff only their own) needs per-row filtering, not implemented. The HOD
-  and staff workspaces' department/self-scoped pages filter what they
-  *show* at the query level; the underlying RLS policies still permit any
-  non-donor staff member to write any row — a page filter, not an RLS
-  boundary. (Staff's own Projects page sidesteps the write half by being
-  read-only — see this session's own EXECUTION.md entry — but the read-side
-  scoping gap is unchanged.)
+  staff only their own) needs per-row filtering, not implemented.
 - Milestone verification isn't reviewer-gated at the RLS layer —
   `app.is_reviewer()` exists and is unused on `project_milestones`.
 - Single-project assumption on the project-related pages (leadership, hod,
-  and now staff) — querying "most recent project" rather than supporting
+  and staff) — querying "most recent project" rather than supporting
   multiple.
 - Task submission (`staff/tasks/[id]`) is still local-only React state, not
   a real write.
 - `database.types.ts` regenerated as UTF-16LE with CRLF **four** separate
-  times now (see LEARNINGS.md, including a real incident where a GitHub-UI
-  merge silently emptied the file because of it) — recurred again at the
-  start of this session, converted the same way as every prior time. No
-  automated normalization exists yet. Treat this as a standing property of
-  the regeneration workflow, not something fixed for good, and check
+  times so far (see LEARNINGS.md, including a real incident where a
+  GitHub-UI merge silently emptied the file because of it) — genuinely
+  UTF-8 already at the start of this session, did not recur a fifth time.
+  No automated normalization exists yet. Treat this as a standing property
+  of the regeneration workflow, not something fixed for good, and check
   `file` on it every session that touches it.
-- Requests (`/hod/requests`, and now `/staff/requests`, same table) has no
-  review flow — `approvals` (0012) has no update policy; a leadership
-  Approvals/Disbursement Queue page to review requests doesn't exist yet.
-  Deliberate v1 scope, not a bug.
-- Payroll (`/hod/payroll`) has no run history — PAYE is computed fresh on
-  every read from whatever the salary columns currently hold, not
-  persisted per period. Salary structure itself can be set through the app
-  (Staff Management).
+- **Requests now has a real review flow** (`/leadership/approvals`, this
+  session) — `0015` added the missing UPDATE policy on `approvals`; the
+  "no review flow" gap logged since 0012 is genuinely closed, confirmed
+  that HOD's and staff's existing Requests pages need zero changes to
+  reflect a decision (both already `select('*')` with no status filter).
+- Payroll (`/hod/payroll` and, as of this session, `/leadership/payroll`)
+  has no run history — PAYE is computed fresh on every read from whatever
+  the salary columns currently hold, not persisted per period.
 - `performance_reviews` (0014) write access isn't attributed at the RLS
   layer — any leadership/hr/admin account can write a review under any
-  `reviewer_code`, including someone else's; the client sets it from the
-  signed-in session but the database doesn't assert it the way
-  `messages.sender_code` does. Whether an employee should ever read their
-  own review is also an open question the handover doesn't answer —
-  neither built, both real gaps.
-- `activity_events` (0011) now has three write paths — HOD Tasks, HOD
-  Submit Report, and staff Submit Report — still not Leadership Timeline,
+  `reviewer_code`, including someone else's. Whether an employee should
+  ever read their own review is also an open question the handover
+  doesn't answer — neither built, both real gaps.
+- `activity_events` (0011) still has only three write paths — HOD Tasks,
+  HOD Submit Report, staff Submit Report — still not Leadership Timeline,
   which remains coming-soon.
 - A Supabase `.select(...)` argument must be one string literal, never
   built by `+` concatenation — doing so silently widens its type to plain
@@ -210,10 +202,27 @@ any prose list, including this file's, before treating a count as current.
 - Resources (`/staff/resources`) reads media only — the handover's own
   description includes templates, which has no table or migration
   anywhere in the app. Deferred plainly, not built as a stub.
-- 21 of 59 unique NGO pages are still `/coming-soon` as of the last check
-  (38 built) — every remaining one is leadership-specialized or one of two
-  cross-sector ids that never resolve for this NGO org (`p-pm-projects`,
-  `p-mon-board`). Staff, HOD, and HR workspaces are all now fully built —
-  no workspace is even partially unbuilt anymore. This number goes stale
-  the moment another page ships; re-run the resolver script described
-  above rather than trusting it here.
+- **New, from this session**: Invoices (`/leadership/invoices`) is
+  add-only, no edit form for line items after creation — deliberate,
+  matches the pattern already used for fund lines/appointments.
+- **New, from this session**: marking an invoice paid inserts an `income`
+  row but nothing stops marking the *same* invoice paid a second time,
+  which would insert a second income row. Not guarded against — found, not
+  closed, worth a unique constraint or a client-side check if this becomes
+  a real workflow rather than a v1 exercise of the table.
+- **Correction, not just a new gap**: earlier `Known open gaps` sections
+  in this file (as of the 2026-08-31 staff-workspace session) claimed
+  `p-mon-board`/`p-pm-projects` "never resolve true for this NGO org...
+  dead ends for gating reasons." That was checked mechanically this
+  session (`getNavItems('leadership', ...)`) and found wrong — both ids
+  genuinely appear in leadership's real nav output; neither has a
+  `FEATURE_NAV` entry, so nothing gates them at all. They're ordinary
+  coming-soon leadership pages, not dead ends. See docs/EXECUTION.md for
+  the full mechanical check.
+- 16 of 59 unique NGO pages are still `/coming-soon` as of the last check
+  (43 built) — every remaining one is inside `leadership`'s own nav
+  (including `p-mon-board`/`p-pm-projects`, per the correction above).
+  Staff, HOD, and HR workspaces are fully built; finance has only
+  `p-lead-analytics` left; hr has `p-lead-delivery`/`p-lead-access`. This
+  number goes stale the moment another page ships; re-run the resolver
+  script described above rather than trusting it here.
