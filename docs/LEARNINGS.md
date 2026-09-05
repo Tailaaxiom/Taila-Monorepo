@@ -565,3 +565,32 @@ table's column names against a dormant type file, grep
 just the type file itself — a naming choice that looks free (the handover
 said "total," nothing said otherwise) can already be constrained by code
 nobody mentioned, exactly like it was here.
+
+
+## database.types.ts's UTF-16LE recurrence, a fifth time (2026-09-05)
+
+Found genuinely UTF-16LE with CRLF a fifth time, at the start of the
+`p-pm-projects` + leadership read-only-pages session. Traced the likely
+trigger this time, not just re-converted blindly: the previous session
+(Approvals + Money pages) left the file with a hand-added PROVISIONAL
+`invoices` stub, and the very next commit on the branch after that
+session's PR merged was a one-word `"types"` commit — the user running
+the real `supabase gen types typescript --linked` regeneration to replace
+the stub, from whatever machine they run that command on (still almost
+certainly Windows, per every prior entry on this). Converted the same way
+as every previous time (`iconv -f UTF-16LE -t UTF-8`, BOM and `\r`
+stripped) before touching anything.
+
+**Nothing new to add to the lesson itself** — the first entry on this
+(2026-08-19) already states the fix and the "why `tsc`/`next build` don't
+catch it" mechanism, and four more occurrences haven't changed either.
+What's worth recording is the trigger correlation, now visible across two
+consecutive occurrences: **the recurrence lines up with exactly the
+moment a real `supabase gen types` regeneration replaces a PROVISIONAL
+stub**, not with unrelated commits in between. That's consistent with the
+standing theory (a Windows-side `gen types` invocation) and makes the
+practical rule sharper than "check every session": **check `file` on this
+path specifically right after any session where the previous one's own
+EXECUTION.md entry says a stub was pending replacement** — that's the
+highest-probability moment for this to have recurred, not a random spot
+check.
