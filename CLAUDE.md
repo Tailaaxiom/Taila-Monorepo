@@ -154,75 +154,70 @@ cross-reference `page-routes.ts`. See EXECUTION.md's "Backlog reckoning"
 (2026-08-19) entry for the exact script. Re-run it rather than trusting
 any prose list, including this file's, before treating a count as current.
 
-## Known open gaps, current as of 2026-09-02, Approvals + Money pages session (see EXECUTION.md for detail)
+## Known open gaps, current as of 2026-09-05, p-pm-projects + leadership read-only pages session (see EXECUTION.md for detail)
 
 - Task/project write access is org-wide for any non-donor staff member —
   the handover's real rule (leadership org-wide, HOD within department,
   staff only their own) needs per-row filtering, not implemented.
 - Milestone verification isn't reviewer-gated at the RLS layer —
   `app.is_reviewer()` exists and is unused on `project_milestones`.
-- Single-project assumption on the project-related pages (leadership, hod,
-  and staff) — querying "most recent project" rather than supporting
-  multiple.
+- Single-project assumption on the project-related pages — querying "most
+  recent project" rather than supporting multiple.
 - Task submission (`staff/tasks/[id]`) is still local-only React state, not
   a real write.
-- `database.types.ts` regenerated as UTF-16LE with CRLF **four** separate
-  times so far (see LEARNINGS.md, including a real incident where a
-  GitHub-UI merge silently emptied the file because of it) — genuinely
-  UTF-8 already at the start of this session, did not recur a fifth time.
-  No automated normalization exists yet. Treat this as a standing property
-  of the regeneration workflow, not something fixed for good, and check
-  `file` on it every session that touches it.
-- **Requests now has a real review flow** (`/leadership/approvals`, this
-  session) — `0015` added the missing UPDATE policy on `approvals`; the
-  "no review flow" gap logged since 0012 is genuinely closed, confirmed
-  that HOD's and staff's existing Requests pages need zero changes to
-  reflect a decision (both already `select('*')` with no status filter).
-- Payroll (`/hod/payroll` and, as of this session, `/leadership/payroll`)
-  has no run history — PAYE is computed fresh on every read from whatever
-  the salary columns currently hold, not persisted per period.
+- `database.types.ts` regenerated as UTF-16LE with CRLF **five** separate
+  times now (see LEARNINGS.md, including a real incident where a
+  GitHub-UI merge silently emptied the file because of it) — recurred
+  again at the start of this session, converted the same way as every
+  prior time. No automated normalization exists yet. Treat this as a
+  standing property of the regeneration workflow — the pattern now visibly
+  correlates with sessions right after a PROVISIONAL stub gets replaced by
+  a real regeneration, per LEARNINGS.md's latest entry — and check `file`
+  on it every session that touches it, especially those.
+- Requests has a real review flow (`/leadership/approvals`) — closed, not
+  reopened, unchanged this session.
+- Payroll (`/hod/payroll`, `/leadership/payroll`) has no run history —
+  PAYE computed fresh on every read, unchanged.
 - `performance_reviews` (0014) write access isn't attributed at the RLS
   layer — any leadership/hr/admin account can write a review under any
-  `reviewer_code`, including someone else's. Whether an employee should
-  ever read their own review is also an open question the handover
-  doesn't answer — neither built, both real gaps.
-- `activity_events` (0011) still has only three write paths — HOD Tasks,
-  HOD Submit Report, staff Submit Report — still not Leadership Timeline,
-  which remains coming-soon.
+  `reviewer_code`. Whether an employee should ever read their own review
+  is also open. Neither built, both real gaps, unchanged.
+- `activity_events` (0011) has three write paths (HOD Tasks, HOD/staff
+  Submit Report). Timeline and Access Log (this session) both *read* it
+  now, but nothing writes `login`/`logout` events — Access Log's
+  worked-hours section (`buildSessions()`, wired in for real this session)
+  is correctly empty right now, not broken.
 - A Supabase `.select(...)` argument must be one string literal, never
-  built by `+` concatenation — doing so silently widens its type to plain
-  `string`, which collapses the query's inferred return type to
-  postgrest-js's `GenericStringError` instead of the real row shape. See
-  LEARNINGS.md for the full diagnostic; the fix is just writing it as one
-  (possibly long) literal.
+  built by `+` concatenation. See LEARNINGS.md for the full diagnostic.
 - Two dead, unreferenced duplicate routes exist:
-  `leadership/staff/dashboard/` and `leadership/staff/tasks/` are
-  byte-identical copies of `staff/dashboard/`/`staff/tasks/`, linked from
-  nowhere. Found, not removed — flagged for the user to decide.
-- Resources (`/staff/resources`) reads media only — the handover's own
-  description includes templates, which has no table or migration
-  anywhere in the app. Deferred plainly, not built as a stub.
-- **New, from this session**: Invoices (`/leadership/invoices`) is
-  add-only, no edit form for line items after creation — deliberate,
-  matches the pattern already used for fund lines/appointments.
-- **New, from this session**: marking an invoice paid inserts an `income`
-  row but nothing stops marking the *same* invoice paid a second time,
-  which would insert a second income row. Not guarded against — found, not
-  closed, worth a unique constraint or a client-side check if this becomes
-  a real workflow rather than a v1 exercise of the table.
-- **Correction, not just a new gap**: earlier `Known open gaps` sections
-  in this file (as of the 2026-08-31 staff-workspace session) claimed
-  `p-mon-board`/`p-pm-projects` "never resolve true for this NGO org...
-  dead ends for gating reasons." That was checked mechanically this
-  session (`getNavItems('leadership', ...)`) and found wrong — both ids
-  genuinely appear in leadership's real nav output; neither has a
-  `FEATURE_NAV` entry, so nothing gates them at all. They're ordinary
-  coming-soon leadership pages, not dead ends. See docs/EXECUTION.md for
-  the full mechanical check.
-- 16 of 59 unique NGO pages are still `/coming-soon` as of the last check
-  (43 built) — every remaining one is inside `leadership`'s own nav
-  (including `p-mon-board`/`p-pm-projects`, per the correction above).
-  Staff, HOD, and HR workspaces are fully built; finance has only
-  `p-lead-analytics` left; hr has `p-lead-delivery`/`p-lead-access`. This
+  `leadership/staff/dashboard/` and `leadership/staff/tasks/` — flagged
+  for the user to decide, still not removed.
+- Resources (`/staff/resources`) reads media only — templates half
+  deferred, no table.
+- Invoices (`/leadership/invoices`) is add-only; marking the same invoice
+  paid twice isn't guarded against. `approvals_update_by_finance` (0015)
+  is a plain role check, can't distinguish "approve/reject" from "edit any
+  other column." All unchanged this session.
+- **New, from this session**: `p-pm-projects` now routes to
+  `/leadership/projects` — a **mechanical** determination (no
+  `FEATURE_NAV` gate on either id, no distinct dormant business-logic
+  module for "pm" anywhere in `packages/core`, unlike `p-mon-board` which
+  has a real one waiting), **not a re-confirmation against the original
+  handover text** — that document isn't available in this session (not in
+  the repo, not in this session's uploads). Worth the user's own check
+  against their copy of the handover if they have one.
+- **New, from this session**: Regional (`/leadership/regional`) has no
+  way to attribute `income`/`expenses` to a hub — neither table has an
+  employee or hub reference at all. Stated on the page, not faked.
+- **New, from this session**: Timeline, Access Log, Delivery Tracker, and
+  Regional are all real pages but their content depends entirely on real
+  data (login/logout events, hub assignments, task deliverables/proof)
+  this sandbox has no live credentials to check — not yet tested against
+  real data for that reason.
+- 9 of 59 unique NGO pages are still `/coming-soon` as of the last check
+  (50 built) — all nine inside `leadership`'s own nav: `p-lead-analytics`,
+  `p-lead-command`, `p-lead-customize`, `p-lead-formbuilder`,
+  `p-lead-settings`, `p-lead-story`, `p-lead-targets`, `p-lead-templates`,
+  `p-mon-board`. Staff, HOD, and HR workspaces are all fully built. This
   number goes stale the moment another page ships; re-run the resolver
   script described above rather than trusting it here.

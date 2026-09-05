@@ -11,6 +11,15 @@ const PAGE_ROUTES: Record<string, string> = {
   'p-lead-overview': '/leadership/dashboard',
   'p-lead-tasks': '/leadership/tasks',
   'p-lead-projects': '/leadership/projects',
+  // p-pm-projects is a distinct nav id from p-lead-projects, but resolves
+  // to the same page — same route-table shape as p-lead-staff/
+  // p-lead-add-staff both pointing at /leadership/staff. No FEATURE_NAV
+  // gate on either id, no separate ported business-logic module for "pm"
+  // anywhere in packages/core (unlike p-mon-board, which has a real,
+  // still-dormant packages/core/src/monitoring/aggregate.ts waiting for
+  // it). Determined mechanically, not by re-reading the original handover
+  // text — it isn't available in this session. See docs/EXECUTION.md.
+  'p-pm-projects': '/leadership/projects',
   'p-lead-budget': '/leadership/budget',
   'p-lead-staff': '/leadership/staff',
   'p-lead-add-staff': '/leadership/staff',
@@ -21,6 +30,12 @@ const PAGE_ROUTES: Record<string, string> = {
   'p-lead-spend': '/leadership/spend',
   'p-lead-invoices': '/leadership/invoices',
   'p-lead-payroll': '/leadership/payroll',
+  'p-lead-timeline': '/leadership/timeline',
+  'p-lead-access': '/leadership/access',
+  'p-lead-delivery': '/leadership/delivery',
+  'p-lead-regional': '/leadership/regional',
+  'p-lead-reports': '/leadership/reports',
+  'p-lead-summaries': '/leadership/summaries',
   'p-donor-impact': '/donor/impact',
   'p-donor-funds': '/donor/funds',
   'p-donor-media': '/donor/media',

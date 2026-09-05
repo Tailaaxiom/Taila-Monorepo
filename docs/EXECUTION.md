@@ -1558,64 +1558,199 @@ paid, confirm a matching row appears on `/leadership/income` and the
 Budget & Spend totals include it; confirm a `staff`/`hod`/`hr` account
 cannot reach any of the five new routes directly by URL.
 
-## Open at end of this session (2026-09-02, Approvals + Money pages)
+## 2026-09-05 — p-pm-projects routing, and six leadership read-only pages
 
-**Convention note**: this section is rewritten in full every time it's
-touched, relocated here to the true end of the file (it had drifted to sit
-above the dated entry describing the same session's work in the prior
-version of this file — a structural slip, fixed here, not left for the
-next session to trip over). Every number below comes from this session's
-own fresh resolver run, not inherited.
+Two things this pass, per the task brief: settle whether `p-pm-projects`
+needed its own new page, then build the six remaining read-only leadership
+pages that don't need one.
+
+**`p-pm-projects` — checked mechanically, not assumed.** Confirmed:
+appears exactly once across the entire gating catalog (only in
+`NAVMAP.leadership`), has zero `FEATURE_NAV` entry (same as `p-mon-board`),
+and `MODULE_CATALOG` has no `'pm'` key at all — the only module labeled
+"Project Management" is `'social'` (a completely different, gated nav
+cluster: `p-sm-who`/`p-sm-posts`/`p-sm-setup`/`p-sm-roster`), so the `pm`
+prefix doesn't tie into that system either; it's coincidental. Unlike
+`p-mon-board` (which has a real, still-dormant
+`packages/core/src/monitoring/aggregate.ts` waiting for it — a genuine
+distinct future page), there is no separate ported business-logic module
+anywhere in `packages/core` for "pm" — the only projects logic that exists
+(`projects/milestones.ts`) is the exact module already powering
+`p-lead-projects`/`p-hod-projects`/`p-staff-projects`.
+
+**Honest limit on this determination**: the original handover PDF/
+markdown that grounded the earlier `p-lead-staff`/`p-lead-add-staff` call
+(explicitly cited as "tightly coupled" per that document, back on
+2026-08-18) is not available in this session — not in the repo, not in
+this session's uploads. This determination is mechanical only, not a
+re-confirmation against the handover text the task asked for. Routed
+`p-pm-projects` → `/leadership/projects` in `page-routes.ts` (same
+route-table shape as `p-lead-staff`/`p-lead-add-staff` → `/leadership/staff`)
+on that mechanical basis, reversible in one line if the user's own copy of
+the handover says otherwise.
+
+**Fresh resolver baseline, not inherited from the last session's number**:
+**43/59 built** going in (matched the Approvals+Money session's own
+closing count exactly, confirming no drift between sessions). Re-run after
+this batch: **50 of 59 unique NGO pages built, 9 still `/coming-soon`**.
+`hr`'s workspace is now fully built too (10/10 — `p-lead-delivery` and
+`p-lead-access` were its last two). Remaining 9:
+`p-lead-analytics`, `p-lead-command`, `p-lead-customize`,
+`p-lead-formbuilder`, `p-lead-settings`, `p-lead-story`, `p-lead-targets`,
+`p-lead-templates`, `p-mon-board` — matches the task's own "not in this
+batch" list (Org Settings, Customize, Monitoring, Targets & Tasks as
+separate future prompts; Live Command Map/Storytelling Engine/Form
+Builder deferred for their own focused pass) plus `p-lead-analytics`
+(Impact and Reach), not mentioned either way in this batch's brief, left
+untouched.
+
+**No new migrations** — every table this batch reads
+(`activity_events`, `activities`, `tasks`, `employees`, `income`,
+`expenses`, `approvals`, `media`, `projects`/`project_milestones`,
+`summary_reports`) already exists with tested RLS. All six pages gated
+per the real `NAVMAP` reach, checked with a script rather than assumed:
+`p-lead-timeline`/`p-lead-regional`/`p-lead-reports`/`p-lead-summaries`
+are leadership-only (`['leadership','admin']`);
+`p-lead-access`/`p-lead-delivery` are also genuinely reachable by `hr`
+(`['leadership','hr','admin']`) — confirmed by grepping `hr`'s actual
+`NAVMAP` array, not by pattern-matching from HOD's role set.
+
+**Pages**:
+
+- **Timeline** (`/leadership/timeline`) — merges `activity_events` and
+  `activities` into one sorted feed, matching the handover's own framing
+  ("composed read across activity_events and activities") rather than
+  building a second Access Log under a different name. `activities` RLS
+  (`activities_read_org`, 0004) is a plain org-match with no role
+  restriction at all (even donors can read it, since it also backs the
+  donor Impact Report) — reading it alongside the donor-excluded
+  `activity_events` here is still safe, since RLS enforces each table
+  independently of what the page combines them into.
+- **Access Log** (`/leadership/access`) — org-wide sibling of
+  `/hod/access`. **Real finding, checked not assumed**: grepped every
+  `event_type:` write in the app — only `'report_submitted'` (HOD/staff
+  Submit Report) and `'task_created'` (HOD Tasks) exist; nothing writes
+  `'login'`/`'logout'`. `kpi/sessions.ts`'s `buildSessions()` — ported
+  wholesale on 2026-08-18, dormant ever since, previously surfaced only as
+  a schema-collision risk during the HOD session — is wired in for real
+  here, the first genuine use. It will legitimately return an empty list
+  right now; the page says so explicitly rather than presenting a
+  "Worked Hours" section that looks like it just has no data today.
+- **Delivery Tracker** (`/leadership/delivery`) — `tasks`, org-wide,
+  read-only, using `parseTask`'s already-decoded
+  `deliverables`/`deliverablesDone`/`proofRequired`.
+- **Regional** (`/leadership/regional`) — `employees.hub` is the only
+  hub-bearing column anywhere in the schema. Employee headcount by hub:
+  direct. Tasks by hub: joined via `tasks.assignee` →
+  `employees.employee_code` → `hub`, stated on the page as a best-effort
+  join since `assignee` is free text, not a foreign key. Money
+  (`income`/`expenses`) by hub: **not built** — neither table has any
+  employee or hub reference at all, so there's no reliable way to
+  attribute a row to a hub; said so on the page rather than dumping
+  everything into a fake "Unspecified" bucket. No live Supabase
+  credentials in this sandbox, so whether the page shows anything
+  meaningful depends on real employee data this session can't inspect —
+  noted, not assumed either way.
+- **Reports & Charts** (`/leadership/reports`) — numeric/tabular
+  cross-domain roll-up (tasks by status, project milestone verification,
+  money net, requests by status, media counts), no charting library, same
+  constraint already applied to Spend vs Income. Every number here
+  summarizes a table another page already reads in full detail — this
+  page doesn't introduce a second way of reading any single one.
+- **Summary Reports — leadership** (`/leadership/summaries`) — the third
+  and last of three distinct scopes on `summary_reports`. Staff's version
+  filters to `author_code`, HOD's to `department`. This one has **no
+  filter at all** — every report in the org. Stated as explicitly as the
+  staff-vs-HOD distinction was stated in the staff-workspace session,
+  since it's the identical shape of mistake to make by copying the
+  nearest-looking page's filter out of habit.
+
+`database.types.ts` was, again, genuinely UTF-16LE with CRLF at the start
+of this session — the **fifth** recurrence (confirmed via `file`, not
+assumed; the "types" commit that landed the real regenerated `invoices`
+table after the previous session also brought this back). Converted the
+same way as every prior time before touching anything. See
+docs/LEARNINGS.md.
+
+Verified: `tsc --noEmit` clean in `apps/ngo`; `npx tsc -p
+packages/core/tsconfig.json --noEmit` clean except the same 11
+pre-existing, unrelated dead-ported-type-file errors already logged
+(confirmed via `git status` that none of those files are touched this
+session). `next build` clean, 57 routes, all 6 new `/leadership/*` routes
+correctly dynamic (ƒ). `eslint` clean on every new file.
+
+**Not yet tested against real data** — no live Supabase session in this
+sandbox, so whether Timeline/Access Log/Delivery Tracker/Regional show
+anything beyond their empty states depends entirely on what's already in
+the live project. Natural next checks once real data exists: confirm
+Timeline interleaves both tables correctly by timestamp rather than
+grouping them; confirm Access Log's worked-hours section starts producing
+real sessions the moment any future feature writes a `login`/`logout`
+event pair, with zero code changes needed here; confirm Regional's
+employee-by-hub breakdown reflects real hub assignments once any exist.
+
+## Open at end of this session (2026-09-05, p-pm-projects + six leadership read-only pages)
+
+**Convention note, and a real correction to the convention's own track
+record**: the previous version of this section (dated 2026-09-02) claimed
+to have been "relocated here to the true end of the file... a structural
+slip, fixed here, not left for the next session to trip over." Checked
+this session via `git show HEAD:docs/EXECUTION.md | tail`, before writing
+anything: that claim was false. The section was still sitting *before*
+the 2026-09-02 dated entry describing that session's own work, exactly
+the same slip as the session before it, just re-asserted as fixed without
+actually being fixed. Removed from its stale position and this fresh copy
+placed at the file's real last line — confirmed with `tail`/`wc -l`
+immediately after, not assumed. If this recurs a third time, the pattern
+itself (not just the content) is the thing to fix — possibly by not
+narrating the relocation in prose at all and just trusting the tool to
+put text where the edit says to put it.
 
 **Authoritative source for "what pages are missing"**: not this list — run
 the real gating resolver against every role and cross-reference
 `page-routes.ts` (script not committed anywhere in the repo; rewrite it
 from `getNavItems()`/`NAVMAP`/`routeForPage()` and the NGO fixture
-described in the 2026-08-18 entry). As of this session: **43 of 59 unique
-NGO pages built, 16 still `/coming-soon`**. All coming-soon ids are now
-inside `leadership`'s own nav — `p-lead-access`, `p-lead-analytics`,
-`p-lead-command`, `p-lead-customize`, `p-lead-delivery`,
-`p-lead-formbuilder`, `p-lead-regional`, `p-lead-reports`,
-`p-lead-settings`, `p-lead-story`, `p-lead-summaries`, `p-lead-templates`,
-`p-lead-targets`, `p-lead-timeline`, plus `p-mon-board` and
-`p-pm-projects` (genuinely reachable, not dead ends — see the correction
-entry above). Staff, HOD, and HR remain fully built; finance has only
-`p-lead-analytics` left; hr has `p-lead-delivery`/`p-lead-access`.
+described in the 2026-08-18 entry). As of this session: **50 of 59 unique
+NGO pages built, 9 still `/coming-soon`** — all nine inside `leadership`'s
+own nav: `p-lead-analytics`, `p-lead-command`, `p-lead-customize`,
+`p-lead-formbuilder`, `p-lead-settings`, `p-lead-story`, `p-lead-targets`,
+`p-lead-templates`, `p-mon-board`. Staff, HOD, HR are all fully built;
+finance has only `p-lead-analytics` left.
 
 **Genuinely still open, checked against the real current state, not
 copied from an old list**:
 
 - Task/project write access is org-wide for any non-donor staff member —
   the handover's real rule (leadership org-wide, HOD within department,
-  staff only their own) needs per-row filtering, not implemented. Unchanged
-  this session.
+  staff only their own) needs per-row filtering, not implemented.
+  Unchanged this session.
 - Milestone verification isn't reviewer-gated at the RLS layer —
   `app.is_reviewer()` exists (0003) and is unused on `project_milestones`.
 - Single-project assumption on the project-related pages — querying "most
   recent project" rather than supporting multiple. Unchanged.
 - Task submission (`staff/tasks/[id]`) is still local-only React state,
   not a real write.
-- No UI for editing/deleting an appointment, a fund line, or (new this
-  session) an invoice once created — add-only throughout this project, not
-  just this batch.
-- `database.types.ts` regenerated as UTF-16LE with CRLF four separate
-  times so far (see LEARNINGS.md) — genuinely UTF-8 already at the start
-  of this session, did not recur a fifth time, but still no automated
-  guard. Worth a `postinstall`/`predev` normalization script at this
-  point.
+- No UI for editing/deleting an appointment, a fund line, or an invoice
+  once created — add-only throughout this project.
+- `database.types.ts` regenerated as UTF-16LE with CRLF a **fifth** time,
+  found and converted at the start of this session (see LEARNINGS.md) —
+  still no automated guard. Worth a `postinstall`/`predev` normalization
+  script at this point rather than continuing to catch it by hand every
+  session.
 - Messages has no read-receipt, edit, or unsend — immutable by design,
   not a bug.
-- **Requests now has a real review flow** (`/leadership/approvals`, this
-  session) — the "no review policy" gap logged since 0012 is genuinely
-  closed: `0015` added the UPDATE policy, HOD's and staff's Requests pages
-  confirmed to reflect a decision on next render with zero changes on
-  their end.
-- **Payroll (`/hod/payroll` and, this session, `/leadership/payroll`) can
-  be exercised through the app.** Neither has **run history** — PAYE is
-  computed fresh on every read, no persisted "payslip for March 2026."
-- `activity_events` (0011) still has only three write paths (HOD Tasks,
-  HOD Submit Report, staff Submit Report) — not Leadership Timeline, still
-  coming-soon.
+- Requests has a real review flow (`/leadership/approvals`) — closed as of
+  the previous session, unchanged (still working) this one.
+- Payroll (`/hod/payroll`, `/leadership/payroll`) has no run history —
+  PAYE computed fresh on every read, unchanged.
+- `activity_events` (0011) has three write paths (HOD Tasks, HOD/staff
+  Submit Report) — **Timeline and Access Log now both read it (this
+  session)**, but neither writes to it; still nothing produces
+  `login`/`logout` events, so `buildSessions()`'s worked-hours output on
+  the new Access Log page is empty by construction. The first real
+  candidate to close this would be the auth flow itself
+  (`middleware.ts`/sign-in) writing a `login` event and some kind of
+  explicit sign-out writing `logout` — neither exists today.
 - `performance_reviews` (0014) write access isn't attributed at the RLS
   layer — unchanged, not this batch's table.
 - Two dead, unreferenced duplicate routes exist:
@@ -1624,22 +1759,26 @@ copied from an old list**:
 - `docs/INTERFACE.md` still on hold.
 - Resources (`/staff/resources`) reads media only — templates half still
   deferred, no table.
-- **New, from this session**: Invoices (`/leadership/invoices`) is
-  add-only and has no edit form for line items after creation — a
-  deliberate v1 scope decision (see this session's own entry), matching
-  the pattern already used for fund lines and appointments, not an
-  oversight.
-- **New, from this session**: marking an invoice paid inserts an `income`
-  row but does not (and structurally cannot, without a schema change)
-  prevent marking the *same* invoice paid twice, which would insert a
-  second income row for the same invoice. Not guarded against — a real,
-  found-but-not-closed gap, worth a unique constraint or a client-side
-  status check tightened later if this becomes a real workflow rather than
-  a v1 exercise of the table.
-- **New, from this session**: `approvals_update_by_finance` (0015) is a
-  plain role check, same limitation already accepted for
-  `project_milestones_write_by_staff` — it can't distinguish "approve/
-  reject" from "edit any other column on the row" at the RLS layer. Not
-  currently exploitable through this project's own UI (the Approvals page
-  only ever sends `{status, reviewed_by, reviewed_at}`), but a real gap if
-  any other client ever writes through this policy.
+- Invoices (`/leadership/invoices`) is add-only; marking the same invoice
+  paid twice isn't guarded against. Both unchanged this session.
+- `approvals_update_by_finance` (0015) is a plain role check, can't
+  distinguish "approve/reject" from "edit any other column." Unchanged.
+- **New, from this session**: `p-pm-projects` now routes to
+  `/leadership/projects`, same page as `p-lead-projects` — a mechanical
+  determination (no `FEATURE_NAV` gate, no distinct dormant business-logic
+  module for it anywhere in `packages/core`), **not a re-confirmation
+  against the original handover text**, which isn't available in this
+  session. Worth the user's own sign-off against their copy of the
+  handover if they have one, since this is the one call in this batch made
+  without the same evidence standard the rest of the project holds itself
+  to.
+- **New, from this session**: Regional (`/leadership/regional`) has no
+  way to attribute `income`/`expenses` rows to a hub — neither table has
+  any employee or hub reference. Stated on the page itself, not silently
+  narrower than it looks.
+- **New, from this session**: whether Timeline, Access Log, Delivery
+  Tracker, or Regional show anything beyond their empty states depends
+  entirely on real data in the live project (login/logout events, hub
+  assignments, deliverables/proof on real tasks) that this sandbox has no
+  credentials to inspect. Not yet tested against real data for exactly
+  that reason.
